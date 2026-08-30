@@ -283,7 +283,9 @@ def _render_admin(action="/admin/create", title="New campaign",
                            f"style='display:inline'><button style='all:unset;color:#c96060;"
                            f"font-size:12px;cursor:pointer;'>delete</button></form>")
             elif r["status"] == "approved":
-                actions = (f"<form method='post' action='/admin/cancel/{r['id']}' "
+                actions = (f"<a href='/admin/edit/{r['id']}' style='color:#c2a273;"
+                           f"font-size:12px;margin-right:8px;'>edit</a>"
+                           f"<form method='post' action='/admin/cancel/{r['id']}' "
                            f"style='display:inline'><button style='all:unset;color:#c96060;"
                            f"font-size:12px;cursor:pointer;'>cancel send</button></form>")
             elif r["status"] == "rejected":
@@ -370,8 +372,9 @@ def admin_form(user: str = Depends(_admin), brand: str = "dolce"):
 def admin_edit_form(cid: int, user: str = Depends(_admin)):
     with db.connect() as con:
         r = con.execute("SELECT * FROM campaigns WHERE id=?", (cid,)).fetchone()
-    if not r or r["status"] != "pending":
-        return _page("Only campaigns still waiting for approval can be edited.")
+    if not r or r["status"] not in ("pending", "approved"):
+        return _page("Sent campaigns can't be edited - open the campaign and use "
+                     "Duplicate instead.")
     keys = r.keys()
     aud = (r["audience"] if "audience" in keys else "all") or "all"
     vals = {"name": r["name"], "subject": r["subject"],
@@ -393,9 +396,11 @@ def admin_edit(cid: int, user: str = Depends(_admin), name: str = Form(...),
                                   audience=audience)
     except ValueError as e:
         return _page(str(e))
-    return _page(f"Campaign <b>{html_mod.escape(name)}</b> updated. A fresh test copy "
-                 f"and approval email are on their way to {config.APPROVER_EMAIL}; "
-                 "the previous approval links no longer work.")
+    return _page(f"Campaign <b>{html_mod.escape(name)}</b> updated and paused for "
+                 f"re-approval. A fresh test copy and approval email are on their way "
+                 f"to {config.APPROVER_EMAIL}; the previous approval links no longer "
+                 "work. Anyone who already received it will NOT get it again - after "
+                 "you approve, sending resumes with the new version for the rest.")
 
 
 @app.get("/admin/view/{cid}")
@@ -414,7 +419,7 @@ def admin_view(cid: int, user: str = Depends(_admin)):
     btn = ("display:inline-block;padding:10px 22px;border-radius:8px;"
            "text-decoration:none;font-size:13px;letter-spacing:1px;")
     acts = []
-    if st == "pending":
+    if st in ("pending", "approved"):
         acts.append(f"<a href='/admin/edit/{cid}' style='{btn}background:#c2a273;"
                     f"color:#fff;'>EDIT</a>")
     if st == "approved":

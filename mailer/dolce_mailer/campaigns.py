@@ -31,13 +31,16 @@ def create_from_html(name: str, subject: str, html: str,
 
 def update_campaign(cid: int, name: str, subject: str, html: str,
                     heading: str, body_raw: str, audience: str = "all"):
-    """Edit a pending campaign: new content, fresh token (old links die),
-    back to pending, review emails re-sent."""
+    """Edit a pending or mid-send (approved) campaign: new content, fresh
+    token (old links die), back to pending for re-approval. People already
+    sent this campaign keep their record and are never re-sent; after
+    re-approval the queue resumes with the new content for the rest."""
     token = db.new_token()
     with db.connect() as con:
         row = con.execute("SELECT status FROM campaigns WHERE id=?", (cid,)).fetchone()
-        if not row or row["status"] != "pending":
-            raise ValueError("only pending campaigns can be edited")
+        if not row or row["status"] not in ("pending", "approved"):
+            raise ValueError("Sent campaigns can't be edited - use Duplicate. "
+                             "Rejected ones: delete and recreate.")
         con.execute(
             "UPDATE campaigns SET name=?, subject=?, html=?, token=?, heading=?, "
             "body_raw=?, audience=?, status='pending' WHERE id=?",
