@@ -65,17 +65,24 @@ def new_token():
     return secrets.token_urlsafe(24)
 
 
+BRAND_KEYS = ("dolce", "polished", "core")
+
+
 def eligible_contacts(con, audience="all"):
-    """Contacts we are allowed to email: consented, not unsubscribed, not
-    suppressed - optionally narrowed to a brand audience (a Wix label)."""
+    """Who can actually be emailed. Two keys are always required:
+      1. consent  - the `consented` label (permission to contact at all)
+      2. membership - at least one brand label (dolce/polished/core)
+    `consented` alone sends NOTHING. audience="all" means everyone who
+    belongs to at least one brand; a brand audience narrows to that brand."""
     rows = con.execute(
         """SELECT c.* FROM contacts c
            WHERE c.consented = 1 AND c.unsubscribed = 0
              AND c.email NOT IN (SELECT email FROM suppression)"""
     ).fetchall()
     if audience and audience != "all":
-        rows = [r for r in rows if audience in (r["labels"] or "")]
-    return rows
+        return [r for r in rows if audience in (r["labels"] or "")]
+    return [r for r in rows
+            if any(b in (r["labels"] or "") for b in BRAND_KEYS)]
 
 
 if __name__ == "__main__":
