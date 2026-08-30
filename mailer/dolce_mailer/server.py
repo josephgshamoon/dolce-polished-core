@@ -36,7 +36,7 @@ def _page(msg: str) -> HTMLResponse:
   <div style="max-width:480px;margin:9vh auto;background:#fff;border-radius:10px;
               padding:44px 36px;text-align:center;
               box-shadow:0 8px 30px rgba(157,129,132,.18);">
-    <img src="/static/dolce-logo.jpg" alt="Dolce Aesthetic Clinic"
+    <img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic"
          style="width:170px;max-width:70%%;">
     <p style="font-size:17px;line-height:1.6;color:#4a4a4a;margin-top:28px;">{msg}</p>
     <p style="font-family:Arial;font-size:11px;letter-spacing:2px;color:#c2a273;
@@ -150,7 +150,7 @@ ADMIN_PAGE = """
 <body>
   <div class="card">
     <div class="head">
-      <img src="/static/dolce-logo.jpg" alt="Dolce Aesthetic Clinic">
+      <img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic">
       <h1>New campaign</h1>
       <p class="sub">Write it here - approve it from your inbox - we send it carefully.</p>
     </div>

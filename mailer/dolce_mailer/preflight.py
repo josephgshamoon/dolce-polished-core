@@ -12,7 +12,7 @@ def check():
         raise SystemExit(
             f"PREFLIGHT FAILED: APP_BASE_URL is '{base}' - still a placeholder "
             "or not https. Fix .env before sending.")
-    url = f"{base}/static/dolce-logo.jpg"
+    url = f"{base}/static/dolce-logo.png"
     try:
         r = httpx.get(url, timeout=15, follow_redirects=True)
     except Exception as e:
