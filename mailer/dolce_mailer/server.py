@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +32,7 @@ def _page(msg: str) -> HTMLResponse:
 <!doctype html><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>Dolce</title>
+<link rel='icon' type='image/png' href='/static/dolce-logo.png'>
 <style>
   :root{{--page:#f5eff0;--card:#fff;--body:#4a4a4a;--gold:#c2a273;
         --shadow:0 8px 30px rgba(157,129,132,.18);}}
@@ -51,6 +52,12 @@ def _page(msg: str) -> HTMLResponse:
   <p class="msg">{msg}</p>
   <p class="foot">DOLCE AESTHETIC CLINIC</p>
 </div></body>""")
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse(Path(__file__).parent / "static" / "dolce-logo.png",
+                        media_type="image/png")
 
 
 @app.get("/approve/{token}")
@@ -118,6 +125,7 @@ ADMIN_PAGE = """
 <!doctype html><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>Dolce Campaigns</title>
+<link rel='icon' type='image/png' href='/static/dolce-logo.png'>
 <style>
   :root{
     --page:#f5eff0; --card:#ffffff; --ink:#2b2b2b; --body:#4a4a4a;
