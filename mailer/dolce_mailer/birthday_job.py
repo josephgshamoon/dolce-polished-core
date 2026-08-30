@@ -8,13 +8,14 @@ birthday column for this to be useful.
 from datetime import date
 from pathlib import Path
 
-from . import config, db, render, send
+from . import config, db, preflight, render, send
 
 TEMPLATE = Path(__file__).parent / "templates" / "birthday.html"
 SUBJECT = "Happy birthday from Dolce"
 
 
 def run():
+    preflight.check()
     if not TEMPLATE.exists():
         print("birthday_job: no birthday template yet, skipping")
         return

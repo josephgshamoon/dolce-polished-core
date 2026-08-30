@@ -7,7 +7,7 @@ CLI:
 import argparse
 from pathlib import Path
 
-from . import config, db, render, send
+from . import config, db, preflight, render, send
 
 
 def create(name: str, subject: str, html_path: str):
@@ -41,6 +41,7 @@ def create(name: str, subject: str, html_path: str):
 
 
 def send_approved():
+    preflight.check()
     with db.connect() as con:
         rows = con.execute("SELECT * FROM campaigns WHERE status='approved'").fetchall()
         for camp in rows:

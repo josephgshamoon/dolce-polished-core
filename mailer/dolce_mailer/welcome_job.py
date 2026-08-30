@@ -1,13 +1,14 @@
 """Cron entry: sync contacts from Wix, then welcome each new eligible contact ONCE."""
 from pathlib import Path
 
-from . import config, db, render, send, wix_sync
+from . import config, db, preflight, render, send, wix_sync
 
 TEMPLATE = Path(__file__).parent / "templates" / "welcome.html"
 SUBJECT = "Welcome to Dolce"
 
 
 def run():
+    preflight.check()
     wix_sync.run()
     html_template = TEMPLATE.read_text()
     sent = 0
