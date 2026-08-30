@@ -252,6 +252,8 @@ def _campaign_html(heading: str, body: str) -> str:
                  .replace("{{body}}", body_html))
 
 
+SINGLE_BRAND = True  # Dolce-only for now; set False to show all brand tabs
+
 BRANDS = [("dolce", "Dolce"), ("polished", "Polished"),
           ("core", "Core"), ("all", "Everyone")]
 BRAND_TITLES = {"dolce": "Dolce (clinic)", "polished": "Polished (salon)",
@@ -261,7 +263,7 @@ BRAND_TITLES = {"dolce": "Dolce (clinic)", "polished": "Polished (salon)",
 def _render_admin(action="/admin/create", title="New campaign",
                   button="CREATE CAMPAIGN", values=None, brand="dolce"):
     v = values or {}
-    tabs = "".join(
+    tabs = "" if SINGLE_BRAND else "".join(
         f"<a class='tab{' active' if key == brand else ''}' "
         f"href='/admin?brand={key}'>{label}</a>" for key, label in BRANDS)
     with db.connect() as con:
@@ -354,6 +356,10 @@ def admin_logout():
 
 @app.get("/admin")
 def admin_form(user: str = Depends(_admin), brand: str = "dolce"):
+    if SINGLE_BRAND:
+        # All current clients are Dolce clients; campaigns reach every
+        # consented contact until the other brands launch.
+        return _render_admin(title="New campaign - Dolce", brand="all")
     if brand not in BRAND_TITLES:
         brand = "dolce"
     return _render_admin(title=f"New campaign - {BRAND_TITLES[brand]}", brand=brand)
