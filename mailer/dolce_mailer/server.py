@@ -271,6 +271,9 @@ def _render_admin(action="/admin/create", title="New campaign",
             "SELECT id, name, status, created_at FROM campaigns "
             "WHERE COALESCE(audience,'all') = ? ORDER BY id DESC LIMIT 10",
             (brand,)).fetchall()
+        sent_counts = {r["id"]: con.execute(
+            "SELECT COUNT(*) FROM sends WHERE kind=?",
+            (f"campaign:{r['id']}",)).fetchone()[0] for r in rows}
     if rows:
         parts = []
         for r in rows:
@@ -298,7 +301,8 @@ def _render_admin(action="/admin/create", title="New campaign",
                 f"var(--gold);'>{html_mod.escape(r['name'])}</a></span>"
                 f"<span>{actions}</span>"
                 f"<span class='pill' style='color:{fg}'>{r['status']}</span>"
-                f"<span class='when'>{r['created_at'][:16]}</span></div>")
+                f"<span class='when'>{sent_counts[r['id']]} sent &middot; "
+                f"{r['created_at'][:16]}</span></div>")
         recent = "".join(parts)
     else:
         recent = ("<p style='color:#a99a9c;font-size:14px;'>No "
@@ -416,6 +420,35 @@ def admin_view(cid: int, user: str = Depends(_admin)):
     m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
     inner = m.group(1) if m else preview_html
     st = r["status"]
+    with db.connect() as con:
+        recipients = con.execute(
+            """SELECT s.sent_at, c.first_name, c.email FROM sends s
+               LEFT JOIN contacts c ON c.wix_id = s.wix_id
+               WHERE s.kind = ? ORDER BY s.sent_at""",
+            (f"campaign:{cid}",)).fetchall()
+        planned = len(db.eligible_contacts(con, aud)) if st in ("pending", "approved") else None
+    n_sent = len(recipients)
+    if recipients:
+        rec_rows = "".join(
+            f"<div style='display:flex;justify-content:space-between;gap:10px;"
+            f"padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;'>"
+            f"<span>{html_mod.escape(rc['first_name'] or '')}</span>"
+            f"<span style='color:var(--faint)'>{html_mod.escape(rc['email'] or 'contact removed')}</span>"
+            f"<span style='color:var(--faint);white-space:nowrap'>{(rc['sent_at'] or '')[:16]}</span></div>"
+            for rc in recipients)
+        delivery = (f"<details style='margin-top:14px;'><summary style='cursor:pointer;"
+                    f"color:var(--gold);font-size:14px;'>Sent to {n_sent} client(s) - "
+                    f"see who</summary><div style='margin-top:10px;'>{rec_rows}</div></details>")
+    else:
+        delivery = ""
+    if planned is not None:
+        remaining = planned - n_sent
+        plan_line = (f"<p style='font-size:13.5px;color:var(--faint);margin:10px 0 0;'>"
+                     f"Audience: {planned} consented client(s)"
+                     + (f" &middot; {n_sent} already sent, {remaining} remaining"
+                        if n_sent else "") + "</p>")
+    else:
+        plan_line = ""
     btn = ("display:inline-block;padding:10px 22px;border-radius:8px;"
            "text-decoration:none;font-size:13px;letter-spacing:1px;")
     acts = []
@@ -460,7 +493,7 @@ def admin_view(cid: int, user: str = Depends(_admin)):
         letter-spacing:1px;border:1px solid currentColor;border-radius:999px;
         padding:3px 10px;">{st}</span> &nbsp;&middot;&nbsp; {r['created_at'][:16]}</p>
       <p style="margin:0 0 8px;">{''.join(acts)}</p>
-      {note}
+      {note}{plan_line}{delivery}
     </div>
     <p style="font-family:Georgia,serif;color:var(--ink);font-size:16px;
        margin:24px 0 8px;">How it looks to clients:</p>
