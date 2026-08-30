@@ -255,8 +255,7 @@ def _campaign_html(heading: str, body: str) -> str:
 
 SINGLE_BRAND = False  # tabs visible; Dolce is the default tab
 
-BRANDS = [("dolce", "Dolce"), ("polished", "Polished"),
-          ("core", "Core"), ("all", "Everyone")]
+BRANDS = [("dolce", "Dolce"), ("polished", "Polished"), ("core", "Core")]
 BRAND_TITLES = {"dolce": "Dolce (clinic)", "polished": "Polished (salon)",
                 "core": "Core (studio)", "all": "Everyone"}
 
@@ -362,11 +361,7 @@ def admin_logout():
 
 @app.get("/admin")
 def admin_form(user: str = Depends(_admin), brand: str = "dolce"):
-    if SINGLE_BRAND:
-        # All current clients are Dolce clients; campaigns reach every
-        # consented contact until the other brands launch.
-        return _render_admin(title="New campaign - Dolce", brand="all")
-    if brand not in BRAND_TITLES:
+    if brand not in ("dolce", "polished", "core"):
         brand = "dolce"
     return _render_admin(title=f"New campaign - {BRAND_TITLES[brand]}", brand=brand)
 
