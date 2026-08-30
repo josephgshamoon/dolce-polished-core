@@ -57,3 +57,8 @@ Source: Wix dashboard screenshot provided by client (last 30 days), plus live ch
 - All services systemd-managed (24/7, restart on failure, boot-persistent);
   cron automation verified self-sending after service recovery.
 - Preflight took its first live catch (blocked a send during service restart).
+
+## Milestone - 30 August 2026: first production-path welcome delivered
+- New contact (added in Wix, labeled consented) received the welcome via the
+  normal automated flow - no test overrides. RGBA logo confirmed rendering
+  correctly. Cold-inbox delivery successful. Template and pipeline final.
