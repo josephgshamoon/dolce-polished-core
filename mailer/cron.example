@@ -1,0 +1,4 @@
+# m h dom mon dow command                       (run as the app user, venv python)
+*/15 * * * *  cd /opt/dolce-mailer && python -m dolce_mailer.welcome_job
+*/5  * * * *  cd /opt/dolce-mailer && python -m dolce_mailer.campaigns send-approved
+0 7  * * *    cd /opt/dolce-mailer && python -m dolce_mailer.birthday_job
