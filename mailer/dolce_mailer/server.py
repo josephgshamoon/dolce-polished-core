@@ -187,6 +187,10 @@ ADMIN_PAGE = """
 </style>
 <body>
   <div class="card">
+    <div style="display:flex;justify-content:flex-end;gap:14px;padding:12px 16px 0;">
+      <a href="/admin" style="font-size:12px;color:var(--muted);text-decoration:none;">&#8635; Refresh</a>
+      <a href="/admin/logout" style="font-size:12px;color:var(--muted);text-decoration:none;">Log out</a>
+    </div>
     <div class="head">
       <img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic">
       <h1>%%FORM_TITLE%%</h1>
@@ -318,6 +322,16 @@ def _render_admin(action="/admin/create", title="New campaign",
     for opt in ("all", "dolce", "polished", "core"):
         page = page.replace(f"%%SEL_{opt}%%", "selected" if opt == aud else "")
     return HTMLResponse(page)
+
+
+@app.get("/admin/logout")
+def admin_logout():
+    return HTMLResponse(
+        "<div style='font-family:Arial;max-width:420px;margin:14vh auto;"
+        "text-align:center;color:#4a4a4a;'><h3>Logged out</h3>"
+        "<p>You can close this tab. Visiting the admin page again will ask "
+        "for the login.</p></div>",
+        status_code=401, headers={"WWW-Authenticate": 'Basic realm="dolce"'})
 
 
 @app.get("/admin")
