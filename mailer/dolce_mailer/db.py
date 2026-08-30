@@ -59,6 +59,7 @@ def init():
             con.execute("ALTER TABLE campaigns ADD COLUMN body_raw TEXT DEFAULT ''")
         if "audience" not in cols:
             con.execute("ALTER TABLE campaigns ADD COLUMN audience TEXT DEFAULT 'all'")
+        con.execute("UPDATE sends SET kind='welcome:dolce' WHERE kind='welcome'")
 
 
 def new_token():
