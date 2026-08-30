@@ -14,3 +14,16 @@ Source: Wix dashboard screenshot provided by client (last 30 days), plus live ch
 
 ## Core (coreyogapilatesstudio.com)
 - To be measured once Search Console and GA4 are connected
+
+## Milestone — 30 August 2026, sender infrastructure complete
+- hello@dolceclinic.com live on Google Workspace Starter (purchased via Wix)
+- Domain verified in Google Workspace; Gmail activated
+- DNS confirmed live globally (checked externally): SPF, DKIM (google._domainkey),
+  DMARC (p=none, rua to hello@), full Google MX set
+- Test send hello@ -> jshamoon30@gmail.com: delivered to INBOX in 12s,
+  SPF PASS / DKIM PASS (d=dolceclinic.com) / DMARC PASS
+- Remaining for email launch: Wix Email Marketing test campaign (verify Wix-side
+  sender auth), master template approval, Phoenix contact import with consent
+  labels, welcome automation
+- Still open from week 1: Search Console + Google Business Profile lookups under
+  dolce.erbil@gmail.com
