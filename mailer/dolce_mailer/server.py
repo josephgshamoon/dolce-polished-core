@@ -32,17 +32,25 @@ def _page(msg: str) -> HTMLResponse:
 <!doctype html><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>Dolce</title>
-<body style="margin:0;background:#f5eff0;font-family:Georgia,serif;">
-  <div style="max-width:480px;margin:9vh auto;background:#fff;border-radius:10px;
-              padding:44px 36px;text-align:center;
-              box-shadow:0 8px 30px rgba(157,129,132,.18);">
-    <img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic"
-         style="width:170px;max-width:70%%;">
-    <p style="font-size:17px;line-height:1.6;color:#4a4a4a;margin-top:28px;">{msg}</p>
-    <p style="font-family:Arial;font-size:11px;letter-spacing:2px;color:#c2a273;
-              margin-top:32px;">DOLCE AESTHETIC CLINIC</p>
-  </div>
-</body>""")
+<style>
+  :root{{--page:#f5eff0;--card:#fff;--body:#4a4a4a;--gold:#c2a273;
+        --shadow:0 8px 30px rgba(157,129,132,.18);}}
+  @media (prefers-color-scheme: dark){{
+    :root{{--page:#191516;--card:#231e1f;--body:#cfc5c2;--gold:#d0b285;
+          --shadow:0 8px 30px rgba(0,0,0,.5);}}}}
+  body{{margin:0;background:var(--page);font-family:Georgia,serif;}}
+  .card{{max-width:480px;margin:9vh auto;background:var(--card);border-radius:10px;
+        padding:44px 36px;text-align:center;box-shadow:var(--shadow);}}
+  .card img{{width:170px;max-width:70%;}}
+  .msg{{font-size:17px;line-height:1.6;color:var(--body);margin-top:28px;}}
+  .foot{{font-family:Arial;font-size:11px;letter-spacing:2px;color:var(--gold);
+        margin-top:32px;}}
+</style>
+<body><div class="card">
+  <img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic">
+  <p class="msg">{msg}</p>
+  <p class="foot">DOLCE AESTHETIC CLINIC</p>
+</div></body>""")
 
 
 @app.get("/approve/{token}")
@@ -103,48 +111,66 @@ async def brevo_webhook(request: Request):
 
 CAMPAIGN_SHELL = Path(__file__).parent / "templates" / "campaign.html"
 
-STATUS_COLORS = {"pending": ("#8a6d1a", "#faf3d9"), "approved": ("#2e6b32", "#e2f2e3"),
-                 "sent": ("#6b5b3e", "#f1e9dc"), "rejected": ("#8a2626", "#f7e0e0")}
+STATUS_COLORS = {"pending": "#c9a227", "approved": "#5aa860",
+                 "sent": "#a08d63", "rejected": "#c96060"}
 
 ADMIN_PAGE = """
 <!doctype html><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>Dolce Campaigns</title>
 <style>
-  body{margin:0;background:#f5eff0;font-family:Arial,Helvetica,sans-serif;color:#4a4a4a;}
-  .card{max-width:620px;margin:40px auto;background:#fff;border-radius:12px;
-        box-shadow:0 8px 30px rgba(157,129,132,.18);overflow:hidden;}
-  .head{padding:36px 40px 24px;text-align:center;border-bottom:1px solid #ead9dc;}
+  :root{
+    --page:#f5eff0; --card:#ffffff; --ink:#2b2b2b; --body:#4a4a4a;
+    --muted:#8a8a8a; --faint:#a99a9c; --line:#ead9dc; --line-soft:#f3eaec;
+    --field:#fdfbfb; --field-border:#e2d3d6; --chipbg:#faf6f7; --chip:#ffffff;
+    --gold:#c2a273; --gold-hover:#b3925f;
+    --shadow:0 8px 30px rgba(157,129,132,.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --page:#191516; --card:#231e1f; --ink:#f0e9e6; --body:#cfc5c2;
+      --muted:#9a8f90; --faint:#877b7d; --line:#3a3132; --line-soft:#322a2b;
+      --field:#2b2526; --field-border:#463c3d; --chipbg:#2a2425; --chip:#231e1f;
+      --gold:#d0b285; --gold-hover:#c2a273;
+      --shadow:0 8px 30px rgba(0,0,0,.5);
+    }
+  }
+  body{margin:0;background:var(--page);font-family:Arial,Helvetica,sans-serif;color:var(--body);}
+  .card{max-width:620px;margin:40px auto;background:var(--card);border-radius:12px;
+        box-shadow:var(--shadow);overflow:hidden;}
+  .head{padding:36px 40px 24px;text-align:center;border-bottom:1px solid var(--line);}
   .head img{width:190px;max-width:70%;}
-  h1{font-family:Georgia,serif;font-weight:normal;font-size:26px;color:#2b2b2b;
+  h1{font-family:Georgia,serif;font-weight:normal;font-size:26px;color:var(--ink);
      margin:26px 0 6px;}
-  .sub{color:#8a8a8a;font-size:14px;margin:0;}
+  .sub{color:var(--muted);font-size:14px;margin:0;}
   .steps{display:flex;gap:8px;justify-content:center;padding:18px 20px;
-         background:#faf6f7;border-bottom:1px solid #ead9dc;flex-wrap:wrap;}
-  .step{font-size:12.5px;color:#7a6a6c;background:#fff;border:1px solid #ead9dc;
-        border-radius:999px;padding:7px 14px;}
-  .step b{color:#c2a273;}
+         background:var(--chipbg);border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .step{font-size:12.5px;color:var(--muted);background:var(--chip);
+        border:1px solid var(--line);border-radius:999px;padding:7px 14px;}
+  .step b{color:var(--gold);}
   form{padding:30px 40px 40px;}
-  label{display:block;font-size:11px;letter-spacing:2px;color:#c2a273;
+  label{display:block;font-size:11px;letter-spacing:2px;color:var(--gold);
         text-transform:uppercase;margin:22px 0 7px;}
   label:first-of-type{margin-top:0;}
-  input,textarea{width:100%;box-sizing:border-box;border:1px solid #e2d3d6;
+  input,textarea{width:100%;box-sizing:border-box;border:1px solid var(--field-border);
         border-radius:8px;padding:13px 14px;font-size:15px;font-family:inherit;
-        color:#2b2b2b;background:#fdfbfb;transition:border .15s;}
-  input:focus,textarea:focus{outline:none;border-color:#c2a273;background:#fff;}
-  .hint{font-size:12.5px;color:#a99a9c;margin-top:6px;}
-  button{width:100%;margin-top:30px;background:#c2a273;color:#fff;border:0;border-radius:8px;padding:16px;
-        font-size:15px;letter-spacing:1.5px;cursor:pointer;}
-  button:hover{background:#b3925f;}
-  .recent{padding:26px 40px 36px;border-top:1px solid #ead9dc;}
+        color:var(--ink);background:var(--field);transition:border .15s;}
+  input:focus,textarea:focus{outline:none;border-color:var(--gold);}
+  input::placeholder,textarea::placeholder{color:var(--faint);}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:6px;}
+  button{width:100%;margin-top:30px;background:var(--gold);color:#fff;border:0;
+        border-radius:8px;padding:16px;font-size:15px;letter-spacing:1.5px;cursor:pointer;}
+  button:hover{background:var(--gold-hover);}
+  .recent{padding:26px 40px 36px;border-top:1px solid var(--line);}
   .recent h2{font-family:Georgia,serif;font-weight:normal;font-size:19px;
-        color:#2b2b2b;margin:0 0 14px;}
+        color:var(--ink);margin:0 0 14px;}
   .row{display:flex;justify-content:space-between;align-items:center;
-        padding:10px 0;border-bottom:1px solid #f3eaec;font-size:14px;gap:10px;}
+        padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:14px;gap:10px;}
   .row:last-child{border-bottom:0;}
   .pill{font-size:11px;letter-spacing:1px;border-radius:999px;padding:4px 12px;
-        text-transform:uppercase;white-space:nowrap;}
-  .when{color:#b5a7a9;font-size:12px;white-space:nowrap;}
+        text-transform:uppercase;white-space:nowrap;border:1px solid currentColor;
+        background:transparent;}
+  .when{color:var(--faint);font-size:12px;white-space:nowrap;}
   @media(max-width:640px){form,.recent{padding-left:22px;padding-right:22px;}}
 </style>
 <body>
@@ -194,10 +220,10 @@ def admin_form(user: str = Depends(_admin)):
     if rows:
         parts = []
         for r in rows:
-            fg, bg = STATUS_COLORS.get(r["status"], ("#666", "#eee"))
+            fg = STATUS_COLORS.get(r["status"], "#8a8a8a")
             parts.append(
                 f"<div class='row'><span>{html_mod.escape(r['name'])}</span>"
-                f"<span class='pill' style='color:{fg};background:{bg}'>{r['status']}</span>"
+                f"<span class='pill' style='color:{fg}'>{r['status']}</span>"
                 f"<span class='when'>{r['created_at'][:16]}</span></div>")
         recent = "".join(parts)
     else:
