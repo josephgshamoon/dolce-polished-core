@@ -48,3 +48,12 @@ Source: Wix dashboard screenshot provided by client (last 30 days), plus live ch
   dolce.erbil@gmail.com approval flow.
 - Still pending from client: Phoenix export; Search Console and
   business.google.com lookups; Brevo activation (future bulk transport).
+
+## Milestone - 30 August 2026, night: platform feature-complete
+- Transparent PNG logo confirmed rendering correctly in Gmail dark mode.
+- Owner admin portal live at mailer.dolceclinic.com/admin: branded, light/dark
+  theme, favicon, campaign form with [TEST]-copy-then-approve flow, upcoming
+  birthdays panel, recent campaigns with status pills.
+- All services systemd-managed (24/7, restart on failure, boot-persistent);
+  cron automation verified self-sending after service recovery.
+- Preflight took its first live catch (blocked a send during service restart).
