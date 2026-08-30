@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS campaigns (
     html        TEXT NOT NULL,
     status      TEXT DEFAULT 'pending',   -- pending | approved | rejected | sent
     token       TEXT NOT NULL,            -- approval link token
+    heading     TEXT DEFAULT '',
+    body_raw    TEXT DEFAULT '',
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
     decided_at  TEXT,
     sent_at     TEXT
@@ -50,6 +52,10 @@ def connect():
 def init():
     with connect() as con:
         con.executescript(SCHEMA)
+        cols = [r[1] for r in con.execute("PRAGMA table_info(campaigns)")]
+        if "heading" not in cols:
+            con.execute("ALTER TABLE campaigns ADD COLUMN heading TEXT DEFAULT ''")
+            con.execute("ALTER TABLE campaigns ADD COLUMN body_raw TEXT DEFAULT ''")
 
 
 def new_token():

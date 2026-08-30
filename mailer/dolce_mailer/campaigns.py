@@ -16,24 +16,44 @@ def create(name: str, subject: str, html_path: str):
     return create_from_html(name, subject, Path(html_path).read_text())
 
 
-def create_from_html(name: str, subject: str, html: str):
+def create_from_html(name: str, subject: str, html: str,
+                     heading: str = "", body_raw: str = ""):
     token = db.new_token()
     with db.connect() as con:
-        cur = con.execute(
-            "INSERT INTO campaigns (name, subject, html, token) VALUES (?,?,?,?)",
-            (name, subject, html, token),
-        )
-        campaign_id = cur.lastrowid
+        con.execute(
+            "INSERT INTO campaigns (name, subject, html, token, heading, body_raw) "
+            "VALUES (?,?,?,?,?,?)",
+            (name, subject, html, token, heading, body_raw))
         n = len(db.eligible_contacts(con))
+    _send_review(name, subject, html, token, n)
+    print(f"campaign '{name}' created; approval email sent to {config.APPROVER_EMAIL}")
+
+
+def update_campaign(cid: int, name: str, subject: str, html: str,
+                    heading: str, body_raw: str):
+    """Edit a pending campaign: new content, fresh token (old links die),
+    back to pending, review emails re-sent."""
+    token = db.new_token()
+    with db.connect() as con:
+        row = con.execute("SELECT status FROM campaigns WHERE id=?", (cid,)).fetchone()
+        if not row or row["status"] != "pending":
+            raise ValueError("only pending campaigns can be edited")
+        con.execute(
+            "UPDATE campaigns SET name=?, subject=?, html=?, token=?, heading=?, "
+            "body_raw=?, status='pending' WHERE id=?",
+            (name, subject, html, token, heading, body_raw, cid))
+        n = len(db.eligible_contacts(con))
+    _send_review(name, subject, html, token, n)
+
+
+def _send_review(name, subject, html, token, n):
     approve = f"{config.APP_BASE_URL}/approve/{token}"
     reject = f"{config.APP_BASE_URL}/reject/{token}"
-    # 1) a real rendered test copy, so the approver sees exactly what clients get
     preview_contact = {"first_name": "Maya", "unsub_token": "preview"}
     preview_html = render.render(html, preview_contact)
     send.send_email(config.APPROVER_EMAIL, f"[TEST] {subject}", preview_html)
     m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
     preview_inner = m.group(1) if m else preview_html
-    # 2) the short approval email with the buttons
     notice = f"""
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
         <h2 style="font-family:Georgia,serif;font-weight:normal;color:#2b2b2b;">
@@ -57,7 +77,6 @@ def create_from_html(name: str, subject: str, html: str):
       <div style="max-width:660px;margin:0 auto;border:1px solid #ead9dc;
            border-radius:10px;overflow:hidden;">{preview_inner}</div>"""
     send.send_email(config.APPROVER_EMAIL, f"[APPROVAL NEEDED] {name}", notice)
-    print(f"campaign {campaign_id} created; approval email sent to {config.APPROVER_EMAIL}")
 
 
 def send_approved():

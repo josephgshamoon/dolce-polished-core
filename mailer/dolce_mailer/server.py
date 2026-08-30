@@ -185,7 +185,7 @@ ADMIN_PAGE = """
   <div class="card">
     <div class="head">
       <img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic">
-      <h1>New campaign</h1>
+      <h1>%%FORM_TITLE%%</h1>
       <p class="sub">Write it here - approve it from your inbox - we send it carefully.</p>
     </div>
     <div class="steps">
@@ -193,19 +193,19 @@ ADMIN_PAGE = """
       <span class="step"><b>2</b> Approve from %%APPROVER%%</span>
       <span class="step"><b>3</b> Sent to consented clients only</span>
     </div>
-    <form method="post" action="/admin/create">
+    <form method="post" action="%%ACTION%%">
       <label>Campaign name <span style="color:#b5a7a9;text-transform:none;letter-spacing:0;">(just for you)</span></label>
-      <input name="name" required placeholder="e.g. September glow offer">
+      <input name="name" required placeholder="e.g. September glow offer" value="%%V_NAME%%">
       <label>Subject line</label>
-      <input name="subject" required placeholder="e.g. A little something special for our clients">
+      <input name="subject" required placeholder="e.g. A little something special for our clients" value="%%V_SUBJECT%%">
       <div class="hint">This is what appears in their inbox - keep it warm and short.</div>
       <label>Heading</label>
-      <input name="heading" required placeholder="e.g. An autumn treat, just for you">
+      <input name="heading" required placeholder="e.g. An autumn treat, just for you" value="%%V_HEADING%%">
       <div class="hint">The large title inside the email.</div>
       <label>Message</label>
       <textarea name="body" rows="9" required
-        placeholder="Write naturally, like a note to a client.&#10;&#10;Leave a blank line to start a new paragraph. Every email automatically starts with the client's name and ends with the WhatsApp button and your clinic details."></textarea>
-      <button type="submit">CREATE CAMPAIGN</button>
+        placeholder="Write naturally, like a note to a client.&#10;&#10;Leave a blank line to start a new paragraph. Every email automatically starts with the client's name and ends with the WhatsApp button and your clinic details.">%%V_BODY%%</textarea>
+      <button type="submit">%%BUTTON%%</button>
     </form>
     <div class="recent">
       <h2>Upcoming birthdays <span style="font-size:12px;color:#b5a7a9;">(next 30 days)</span></h2>
@@ -219,18 +219,44 @@ ADMIN_PAGE = """
 </body>"""
 
 
-@app.get("/admin")
-def admin_form(user: str = Depends(_admin)):
+def _campaign_html(heading: str, body: str) -> str:
+    paragraphs = [html_mod.escape(pp.strip()).replace("\n", "<br>")
+                  for pp in body.replace("\r", "").split("\n\n") if pp.strip()]
+    body_html = "<br><br>\n".join(paragraphs)
+    shell = CAMPAIGN_SHELL.read_text()
+    return (shell.replace("{{heading}}", html_mod.escape(heading))
+                 .replace("{{body}}", body_html))
+
+
+def _render_admin(action="/admin/create", title="New campaign",
+                  button="CREATE CAMPAIGN", values=None):
+    v = values or {}
     with db.connect() as con:
         rows = con.execute(
-            "SELECT name, status, created_at FROM campaigns ORDER BY id DESC LIMIT 10"
+            "SELECT id, name, status, created_at FROM campaigns ORDER BY id DESC LIMIT 10"
         ).fetchall()
     if rows:
         parts = []
         for r in rows:
             fg = STATUS_COLORS.get(r["status"], "#8a8a8a")
+            actions = ""
+            if r["status"] == "pending":
+                actions = (f"<a href='/admin/edit/{r['id']}' style='color:#c2a273;"
+                           f"font-size:12px;margin-right:8px;'>edit</a>"
+                           f"<form method='post' action='/admin/delete/{r['id']}' "
+                           f"style='display:inline'><button style='all:unset;color:#c96060;"
+                           f"font-size:12px;cursor:pointer;'>delete</button></form>")
+            elif r["status"] == "approved":
+                actions = (f"<form method='post' action='/admin/cancel/{r['id']}' "
+                           f"style='display:inline'><button style='all:unset;color:#c96060;"
+                           f"font-size:12px;cursor:pointer;'>cancel send</button></form>")
+            elif r["status"] == "rejected":
+                actions = (f"<form method='post' action='/admin/delete/{r['id']}' "
+                           f"style='display:inline'><button style='all:unset;color:#c96060;"
+                           f"font-size:12px;cursor:pointer;'>delete</button></form>")
             parts.append(
                 f"<div class='row'><span>{html_mod.escape(r['name'])}</span>"
+                f"<span>{actions}</span>"
                 f"<span class='pill' style='color:{fg}'>{r['status']}</span>"
                 f"<span class='when'>{r['created_at'][:16]}</span></div>")
         recent = "".join(parts)
@@ -267,21 +293,77 @@ def admin_form(user: str = Depends(_admin)):
               "they appear here.</p>")
     page = (ADMIN_PAGE.replace("%%APPROVER%%", config.APPROVER_EMAIL)
                       .replace("%%RECENT%%", recent)
-                      .replace("%%BIRTHDAYS%%", bd))
+                      .replace("%%BIRTHDAYS%%", bd)
+                      .replace("%%ACTION%%", action)
+                      .replace("%%FORM_TITLE%%", title)
+                      .replace("%%BUTTON%%", button)
+                      .replace("%%V_NAME%%", html_mod.escape(v.get("name", ""), quote=True))
+                      .replace("%%V_SUBJECT%%", html_mod.escape(v.get("subject", ""), quote=True))
+                      .replace("%%V_HEADING%%", html_mod.escape(v.get("heading", ""), quote=True))
+                      .replace("%%V_BODY%%", html_mod.escape(v.get("body", ""))))
     return HTMLResponse(page)
+
+
+@app.get("/admin")
+def admin_form(user: str = Depends(_admin)):
+    return _render_admin()
+
+
+@app.get("/admin/edit/{cid}")
+def admin_edit_form(cid: int, user: str = Depends(_admin)):
+    with db.connect() as con:
+        r = con.execute("SELECT * FROM campaigns WHERE id=?", (cid,)).fetchone()
+    if not r or r["status"] != "pending":
+        return _page("Only campaigns still waiting for approval can be edited.")
+    vals = {"name": r["name"], "subject": r["subject"],
+            "heading": r["heading"] or "", "body": r["body_raw"] or ""}
+    return _render_admin(action=f"/admin/edit/{cid}", title="Edit campaign",
+                         button="SAVE &amp; RESEND FOR APPROVAL", values=vals)
+
+
+@app.post("/admin/edit/{cid}")
+def admin_edit(cid: int, user: str = Depends(_admin), name: str = Form(...),
+               subject: str = Form(...), heading: str = Form(...),
+               body: str = Form(...)):
+    try:
+        campaigns.update_campaign(cid, name, subject,
+                                  _campaign_html(heading, body), heading, body)
+    except ValueError as e:
+        return _page(str(e))
+    return _page(f"Campaign <b>{html_mod.escape(name)}</b> updated. A fresh test copy "
+                 f"and approval email are on their way to {config.APPROVER_EMAIL}; "
+                 "the previous approval links no longer work.")
+
+
+@app.post("/admin/delete/{cid}")
+def admin_delete(cid: int, user: str = Depends(_admin)):
+    with db.connect() as con:
+        r = con.execute("SELECT status, name FROM campaigns WHERE id=?", (cid,)).fetchone()
+        if not r:
+            return _page("Campaign not found.")
+        if r["status"] not in ("pending", "rejected"):
+            return _page("Sent campaigns stay in the history and approved ones must be "
+                         "cancelled first.")
+        con.execute("DELETE FROM campaigns WHERE id=?", (cid,))
+    return _page(f"Campaign <b>{html_mod.escape(r['name'])}</b> deleted. Nothing was sent.")
+
+
+@app.post("/admin/cancel/{cid}")
+def admin_cancel(cid: int, user: str = Depends(_admin)):
+    with db.connect() as con:
+        r = con.execute("SELECT status, name FROM campaigns WHERE id=?", (cid,)).fetchone()
+        if not r or r["status"] != "approved":
+            return _page("Only approved-but-not-yet-sent campaigns can be cancelled.")
+        con.execute("UPDATE campaigns SET status='rejected' WHERE id=?", (cid,))
+    return _page(f"Campaign <b>{html_mod.escape(r['name'])}</b> cancelled before sending.")
 
 
 @app.post("/admin/create")
 def admin_create(user: str = Depends(_admin), name: str = Form(...),
                  subject: str = Form(...), heading: str = Form(...),
                  body: str = Form(...)):
-    paragraphs = [html_mod.escape(p.strip()).replace("\n", "<br>")
-                  for p in body.replace("\r", "").split("\n\n") if p.strip()]
-    body_html = "<br><br>\n".join(paragraphs)
-    shell = CAMPAIGN_SHELL.read_text()
-    campaign_html = (shell.replace("{{heading}}", html_mod.escape(heading))
-                          .replace("{{body}}", body_html))
-    campaigns.create_from_html(name, subject, campaign_html)
+    campaigns.create_from_html(name, subject, _campaign_html(heading, body),
+                               heading=heading, body_raw=body)
     return _page(f"Your campaign <b>{html_mod.escape(name)}</b> is created.<br><br>"
                  f"Now check <b>{config.APPROVER_EMAIL}</b> - the approval email is on its "
                  "way. Nothing sends until you press Approve there.")
