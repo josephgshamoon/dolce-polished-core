@@ -1,0 +1,14 @@
+[Unit]
+Description=Dolce Mailer web endpoints (approve/reject/unsubscribe/webhooks)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=clawdbot
+WorkingDirectory=/home/clawdbot/dolce/dolce-polished-core/mailer
+ExecStart=/home/clawdbot/dolce/dolce-polished-core/mailer/.venv/bin/uvicorn dolce_mailer.server:app --host 127.0.0.1 --port 8080
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
