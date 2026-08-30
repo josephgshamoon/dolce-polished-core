@@ -8,7 +8,7 @@ birthday column for this to be useful.
 from datetime import date
 from pathlib import Path
 
-from . import config, db, preflight, render, send
+from . import alerts, config, db, preflight, render, send
 
 TEMPLATE = Path(__file__).parent / "templates" / "birthday.html"
 SUBJECT = "Happy birthday from Dolce"
@@ -40,4 +40,4 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    alerts.guard("birthday job", run)

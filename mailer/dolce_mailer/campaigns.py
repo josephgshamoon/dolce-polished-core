@@ -9,7 +9,7 @@ import re
 import time
 from pathlib import Path
 
-from . import config, db, preflight, render, send
+from . import alerts, config, db, preflight, render, send
 
 
 def create(name: str, subject: str, html_path: str):
@@ -90,7 +90,7 @@ def send_approved():
         rows = con.execute("SELECT * FROM campaigns WHERE status='approved'").fetchall()
         for camp in rows:
             kind = f"campaign:{camp['id']}"
-            sent, remaining = 0, 0
+            sent, remaining, failures = 0, 0, []
             keys = camp.keys()
             camp_audience = camp["audience"] if "audience" in keys else "all"
             for c in db.eligible_contacts(con, camp_audience):
@@ -101,13 +101,22 @@ def send_approved():
                     remaining += 1
                     continue
                 unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
-                send.send_email(c["email"], camp["subject"],
-                                render.render(camp["html"], c), unsub)
+                try:
+                    send.send_email(c["email"], camp["subject"],
+                                    render.render(camp["html"], c), unsub)
+                except Exception as e:
+                    failures.append(f"{c['email']}: {e}")
+                    continue
                 con.execute("INSERT INTO sends (wix_id, kind) VALUES (?,?)",
                             (c["wix_id"], kind))
                 sent += 1
                 time.sleep(config.SEND_DELAY_SECONDS)
-            if remaining:
+            if failures:
+                alerts.send_alert(
+                    f"[Dolce Mailer] campaign '{camp['name']}': some sends failed",
+                    "These sends failed and will be retried next run:\n\n"
+                    + "\n".join(failures))
+            if remaining or failures:
                 print(f"campaign {camp['id']} ({camp['name']}): {sent} sent this run, "
                       f"{remaining} remaining - continues next run")
             else:
@@ -127,6 +136,6 @@ if __name__ == "__main__":
     sub.add_parser("send-approved")
     args = p.parse_args()
     if args.cmd == "create":
-        create(args.name, args.subject, args.html)
+        alerts.guard("campaign create", lambda: create(args.name, args.subject, args.html))
     else:
-        send_approved()
+        alerts.guard("campaign queue", send_approved)

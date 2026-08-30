@@ -1,6 +1,7 @@
 """Web endpoints: campaign approve/reject, one-click unsubscribe, Brevo webhook."""
 import html as html_mod
 import secrets as pysecrets
+import traceback
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import campaigns, config, db
+from . import alerts, campaigns, config, db
 
 basic = HTTPBasic()
 
@@ -24,6 +25,17 @@ def _admin(creds: HTTPBasicCredentials = Depends(basic)):
     return creds.username
 
 app = FastAPI(title="Dolce Mailer")
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request, exc):
+    alerts.send_alert("[Dolce Mailer] portal error",
+                      f"URL: {request.url}\n\n"
+                      + "".join(traceback.format_exception(exc)))
+    return _page("Something went wrong on our side. The team has been alerted "
+                 "automatically - please try again in a few minutes.")
+
+
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 

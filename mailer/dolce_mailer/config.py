@@ -32,4 +32,6 @@ SEND_DELAY_SECONDS = float(os.environ.get("SEND_DELAY_SECONDS", "1"))
 ADMIN_USER = os.environ.get("ADMIN_USER", "maya")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
+ALERT_EMAIL = os.environ.get("ALERT_EMAIL", "jshamoon30@gmail.com")
+
 CONSENT_LABEL = "consented"

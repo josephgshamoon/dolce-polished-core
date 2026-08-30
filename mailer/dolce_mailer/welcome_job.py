@@ -6,7 +6,7 @@ welcome. Large batches are throttled to MAX_SENDS_PER_RUN per run."""
 import time
 from pathlib import Path
 
-from . import config, db, preflight, render, send, wix_sync
+from . import alerts, config, db, preflight, render, send, wix_sync
 
 TEMPLATE = Path(__file__).parent / "templates" / "welcome.html"
 SUBJECT = "Welcome to Dolce"
@@ -16,7 +16,7 @@ def run():
     preflight.check()
     wix_sync.run()
     html_template = TEMPLATE.read_text()
-    sent = 0
+    sent, failures = 0, []
     with db.connect() as con:
         for c in db.eligible_contacts(con):
             done = con.execute(
@@ -32,14 +32,22 @@ def run():
                 break
             html = render.render(html_template, c)
             unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
-            send.send_email(c["email"], SUBJECT, html, unsub)
+            try:
+                send.send_email(c["email"], SUBJECT, html, unsub)
+            except Exception as e:
+                failures.append(f"{c['email']}: {e}")
+                continue
             con.execute(
                 "INSERT INTO sends (wix_id, kind) VALUES (?, 'welcome')", (c["wix_id"],)
             )
             sent += 1
             time.sleep(config.SEND_DELAY_SECONDS)
     print(f"welcome_job: {sent} welcome email(s) sent")
+    if failures:
+        alerts.send_alert("[Dolce Mailer] welcome emails failed for some contacts",
+                          "These welcome sends failed and will be retried next run:\n\n"
+                          + "\n".join(failures))
 
 
 if __name__ == "__main__":
-    run()
+    alerts.guard("welcome job", run)
