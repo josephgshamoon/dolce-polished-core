@@ -35,3 +35,16 @@ Source: Wix dashboard screenshot provided by client (last 30 days), plus live ch
   hello@dolceclinic.com. Brevo activation pending as future bulk transport.
 - Full chain proven: Wix Contacts sync -> consent label gating -> once-only
   welcome -> first-name personalization -> authenticated delivery.
+
+## Milestone - 30 August 2026, late evening: system COMPLETE end to end
+- Root cause of missing logo: APP_BASE_URL placeholder never saved in .env;
+  fixed, verified by new pre-send preflight (refuses to send if the asset
+  URL is unreachable - wired into welcome, campaign, and birthday paths).
+- Welcome email confirmed rendering with logo in Gmail.
+- Full production stack live: nginx vhost + Let's Encrypt at
+  mailer.dolceclinic.com, systemd service, Wix sync, consent gating,
+  once-only welcome, personalization, unsubscribe endpoint.
+- Remaining to switch on: cron entries; first campaign through the
+  dolce.erbil@gmail.com approval flow.
+- Still pending from client: Phoenix export; Search Console and
+  business.google.com lookups; Brevo activation (future bulk transport).
