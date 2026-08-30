@@ -157,7 +157,7 @@ ADMIN_PAGE = """
     }
   }
   body{margin:0;background:var(--page);font-family:Arial,Helvetica,sans-serif;color:var(--body);}
-  .card{max-width:620px;margin:40px auto;background:var(--card);border-radius:12px;
+  .card{max-width:900px;margin:40px auto;background:var(--card);border-radius:12px;
         box-shadow:var(--shadow);overflow:hidden;}
   .head{padding:36px 40px 24px;text-align:center;border-bottom:1px solid var(--line);}
   .head img{width:190px;max-width:70%;}
@@ -210,7 +210,7 @@ ADMIN_PAGE = """
       <a href="/admin/logout" style="font-size:12px;color:var(--muted);text-decoration:none;">Log out</a>
     </div>
     <div class="head">
-      <img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic">
+      %%LOGO%%
       <h1>%%FORM_TITLE%%</h1>
       <p class="sub">Write it here - approve it from your inbox - we send it carefully.</p>
     </div>
@@ -253,7 +253,7 @@ def _campaign_html(heading: str, body: str) -> str:
                  .replace("{{body}}", body_html))
 
 
-SINGLE_BRAND = True  # Dolce-only for now; set False to show all brand tabs
+SINGLE_BRAND = False  # tabs visible; Dolce is the default tab
 
 BRANDS = [("dolce", "Dolce"), ("polished", "Polished"),
           ("core", "Core"), ("all", "Everyone")]
@@ -332,7 +332,10 @@ def _render_admin(action="/admin/create", title="New campaign",
                       + bd + '</div>')
     else:
         bd_section = ""
-    page = (ADMIN_PAGE.replace("%%BIRTHDAYS_SECTION%%", bd_section)
+    logo_html = ('<img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic" '
+                 'style="width:190px;max-width:70%;">' if brand == "dolce" else "")
+    page = (ADMIN_PAGE.replace("%%LOGO%%", logo_html)
+                      .replace("%%BIRTHDAYS_SECTION%%", bd_section)
                       .replace("%%TABS%%", tabs)
                       .replace("%%AUD%%", brand)
                       .replace("%%APPROVER%%", config.APPROVER_EMAIL)
