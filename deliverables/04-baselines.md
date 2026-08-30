@@ -27,3 +27,11 @@ Source: Wix dashboard screenshot provided by client (last 30 days), plus live ch
   labels, welcome automation
 - Still open from week 1: Search Console + Google Business Profile lookups under
   dolce.erbil@gmail.com
+
+## Milestone - 30 August 2026, evening: custom mailer LIVE
+- Self-hosted mailer on VPS (145.223.88.35) sent its first production emails:
+  welcome_job: 2 welcome email(s) sent (test contacts Maya + Joseph)
+- Transport: Google Workspace SMTP relay (IP-authenticated, TLS), from
+  hello@dolceclinic.com. Brevo activation pending as future bulk transport.
+- Full chain proven: Wix Contacts sync -> consent label gating -> once-only
+  welcome -> first-name personalization -> authenticated delivery.
