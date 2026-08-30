@@ -1,4 +1,4 @@
-# Dolce master email template — build spec
+# Dolce master email template - build spec
 
 ## Platform note (standard practice)
 Wix Email Marketing builds campaigns in its own drag-and-drop editor and does
@@ -7,7 +7,7 @@ not import custom HTML. The HTML file in this folder is therefore:
   2. a ready-to-use HTML template if the programme ever moves to an ESP
      that accepts HTML (Brevo, Mailchimp, Klaviyo).
 
-## Recreate in Wix Email Marketing — block by block
+## Recreate in Wix Email Marketing - block by block
 1. Background: #f6f2ee. Content card: white, max width.
 2. Logo block: upload the real Dolce logo (swap for the "D O L C E" text
    placeholder). Alt text: "Dolce Aesthetic Clinic".
@@ -35,14 +35,14 @@ against the actual logo/brand colours before first real send.
 - Footer identity + unsubscribe on every send, no exceptions.
 
 ## Copy variants that drop into the same shell
-1. Welcome (in the HTML) — sign-off not required as long as no treatments named.
-2. Consultation invitation (Dolce) — NEEDS DOCTOR SIGN-OFF.
-3. Seasonal services note — NEEDS DOCTOR SIGN-OFF.
-4. Monthly newsletter — sign-off if treatments mentioned.
-5. We-miss-you (90 days inactive) — generic wording, no sign-off needed.
+1. Welcome (in the HTML) - sign-off not required as long as no treatments named.
+2. Consultation invitation (Dolce) - NEEDS DOCTOR SIGN-OFF.
+3. Seasonal services note - NEEDS DOCTOR SIGN-OFF.
+4. Monthly newsletter - sign-off if treatments mentioned.
+5. We-miss-you (90 days inactive) - generic wording, no sign-off needed.
 
 ## Approval log
-- 30 Aug 2026 — Master template design APPROVED by client (white banner,
+- 30 Aug 2026 - Master template design APPROVED by client (white banner,
   real logo embedded, single WhatsApp CTA, blush/champagne palette).
   Approval gate for sends: every campaign is test-sent to
   dolce.erbil@gmail.com (+ jshamoon30@gmail.com) and waits for an explicit
