@@ -38,7 +38,7 @@ against the actual logo/brand colours before first real send.
 1. Welcome (in the HTML) - sign-off not required as long as no treatments named.
 2. Consultation invitation (Dolce) - NEEDS DOCTOR SIGN-OFF.
 3. Seasonal services note - NEEDS DOCTOR SIGN-OFF.
-4. Monthly newsletter - sign-off if treatments mentioned.
+4. Newsletter / update (any cadence) - sign-off if treatments mentioned.
 5. We-miss-you (90 days inactive) - generic wording, no sign-off needed.
 
 ## Approval log
