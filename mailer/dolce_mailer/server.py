@@ -1,10 +1,14 @@
 """Web endpoints: campaign approve/reject, one-click unsubscribe, Brevo webhook."""
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import db
 
 app = FastAPI(title="Dolce Mailer")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 
 def _page(msg: str) -> HTMLResponse:
