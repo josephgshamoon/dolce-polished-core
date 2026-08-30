@@ -40,3 +40,11 @@ against the actual logo/brand colours before first real send.
 3. Seasonal services note — NEEDS DOCTOR SIGN-OFF.
 4. Monthly newsletter — sign-off if treatments mentioned.
 5. We-miss-you (90 days inactive) — generic wording, no sign-off needed.
+
+## Approval log
+- 30 Aug 2026 — Master template design APPROVED by client (white banner,
+  real logo embedded, single WhatsApp CTA, blush/champagne palette).
+  Approval gate for sends: every campaign is test-sent to
+  dolce.erbil@gmail.com (+ jshamoon30@gmail.com) and waits for an explicit
+  "approved" before any real send. Automations are approved once at setup
+  via the same test-send, before activation.
