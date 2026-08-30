@@ -5,6 +5,7 @@ CLI:
   python -m dolce_mailer.campaigns send-approved      (cron entry)
 """
 import argparse
+import re
 import time
 from pathlib import Path
 
@@ -28,8 +29,10 @@ def create_from_html(name: str, subject: str, html: str):
     reject = f"{config.APP_BASE_URL}/reject/{token}"
     # 1) a real rendered test copy, so the approver sees exactly what clients get
     preview_contact = {"first_name": "Maya", "unsub_token": "preview"}
-    send.send_email(config.APPROVER_EMAIL, f"[TEST] {subject}",
-                    render.render(html, preview_contact))
+    preview_html = render.render(html, preview_contact)
+    send.send_email(config.APPROVER_EMAIL, f"[TEST] {subject}", preview_html)
+    m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
+    preview_inner = m.group(1) if m else preview_html
     # 2) the short approval email with the buttons
     notice = f"""
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
@@ -48,7 +51,11 @@ def create_from_html(name: str, subject: str, html: str):
         </p>
         <p style="color:#a99a9c;font-size:12px;">Nothing sends until you press Approve.
            Approved campaigns go out within 5 minutes, in gentle batches.</p>
-      </div>"""
+        <p style="font-family:Georgia,serif;color:#2b2b2b;font-size:17px;
+           margin:32px 0 10px;">Preview - exactly what clients receive:</p>
+      </div>
+      <div style="max-width:660px;margin:0 auto;border:1px solid #ead9dc;
+           border-radius:10px;overflow:hidden;">{preview_inner}</div>"""
     send.send_email(config.APPROVER_EMAIL, f"[APPROVAL NEEDED] {name}", notice)
     print(f"campaign {campaign_id} created; approval email sent to {config.APPROVER_EMAIL}")
 
