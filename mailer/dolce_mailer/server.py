@@ -222,10 +222,7 @@ ADMIN_PAGE = """
         placeholder="Write naturally, like a note to a client.&#10;&#10;Leave a blank line to start a new paragraph. Every email automatically starts with the client's name and ends with the WhatsApp button and your clinic details.">%%V_BODY%%</textarea>
       <button type="submit">%%BUTTON%%</button>
     </form>
-    <div class="recent">
-      <h2>Upcoming birthdays <span style="font-size:12px;color:#b5a7a9;">(next 30 days)</span></h2>
-      %%BIRTHDAYS%%
-    </div>
+%%BIRTHDAYS_SECTION%%
     <div class="recent">
       <h2>Recent campaigns</h2>
       %%RECENT%%
@@ -313,15 +310,16 @@ def _render_admin(action="/admin/create", title="New campaign",
             for days, d, nm in upcoming)
         bd += ("<p style='color:#a99a9c;font-size:12.5px;margin-top:10px;'>Each of them "
                "automatically receives the birthday email on the day - nothing to do.</p>")
+        bd_section = ('<div class="recent"><h2>Upcoming birthdays '
+                      '<span style="font-size:12px;color:#b5a7a9;">(next 30 days)</span></h2>'
+                      + bd + '</div>')
     else:
-        bd = ("<p style='color:#a99a9c;font-size:14px;'>No birthdays in the next 30 days. "
-              "Birthday dates come from the client list - once the full list is imported, "
-              "they appear here.</p>")
-    page = (ADMIN_PAGE.replace("%%TABS%%", tabs)
+        bd_section = ""
+    page = (ADMIN_PAGE.replace("%%BIRTHDAYS_SECTION%%", bd_section)
+                      .replace("%%TABS%%", tabs)
                       .replace("%%AUD%%", brand)
                       .replace("%%APPROVER%%", config.APPROVER_EMAIL)
                       .replace("%%RECENT%%", recent)
-                      .replace("%%BIRTHDAYS%%", bd)
                       .replace("%%ACTION%%", action)
                       .replace("%%FORM_TITLE%%", title)
                       .replace("%%BUTTON%%", button)
