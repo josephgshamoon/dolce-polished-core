@@ -16,7 +16,7 @@ not import custom HTML. The HTML file in this folder is therefore:
 5. Button: background #b08d57, white uppercase text, link to
    https://wa.me/9647509000200 with pre-filled text. ONE button per email.
 6. Divider, then footer text block: address, phone, hello@dolceclinic.com,
-   social links in #b08d57. Wix appends its own unsubscribe automatically —
+   social links in #b08d57. Wix appends its own unsubscribe automatically -
    verify it appears in the test send.
 7. Sender settings per campaign: From name "Dolce Aesthetic Clinic",
    from/reply-to hello@dolceclinic.com. Subject sentence case, no ALL CAPS,
