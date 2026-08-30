@@ -23,8 +23,8 @@ not import custom HTML. The HTML file in this folder is therefore:
    no emoji spam. Preheader: one calm sentence.
 
 ## Colour tokens (swap when brand palette is confirmed)
-- Ink: #2b2b2b   - Body: #4a4a4a   - Accent gold: #b08d57
-- Card: #ffffff  - Page: #f6f2ee   - Hairline: #eee6dc
+- Ink: #2b2b2b   - Body: #4a4a4a   - Champagne gold (from logo): #c2a273 (logo script ~#d8b98a on mauve)
+- Card: #ffffff  - Page: #f5eff0   - Hairline: #ead9dc   - Brand mauve (from logo): #9d8184
 Placeholder palette based on the aesthetic-clinic positioning; confirm
 against the actual logo/brand colours before first real send.
 
