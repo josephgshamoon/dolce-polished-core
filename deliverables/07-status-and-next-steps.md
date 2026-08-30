@@ -21,10 +21,15 @@
 - TWO KEYS required for any send: `consented` (permission) + at least one
   brand label (`dolce`/`polished`/`core` = membership). consented alone
   sends NOTHING. Labels stack for multi-business clients.
-- Portal tabs: Dolce (default, only tab with the logo) / Polished / Core /
-  Everyone. Brand tab -> that brand's labeled clients; Everyone -> all
-  clients with at least one brand label. Rows are clickable: view rendered
-  email, edit (pending), cancel (approved), duplicate (any).
+- Portal tabs: Dolce (default, only tab with the logo) / Polished / Core.
+  No Everyone tab - every campaign is brand-specific. Rows are clickable:
+  view rendered email, edit (pending), cancel (approved), duplicate (any).
+- Per-brand welcomes: welcome-dolce (approved, live), welcome-polished and
+  welcome-core (drafts, inert until those brands have labeled clients;
+  need owner approval first). Welcomes tracked per brand - joining a
+  second brand later triggers that brand's welcome.
+- Server deployed and current as of 30 Aug late night. SSH from overseas
+  networks may block port 22 - the Hostinger browser console always works.
 - Failure alerting: job crashes, per-send failures, portal errors email
   jshamoon30@gmail.com (same-subject alerts muted 6h).
 
