@@ -40,11 +40,13 @@ def upsert(raw_contacts):
         for c in raw_contacts:
             info = c.get("info", {})
             emails = info.get("emails", {}).get("items", [])
-            email = next((e.get("email") for e in emails if e.get("email")), None)
+            email = next((e if isinstance(e, str) else e.get("email")
+                          for e in emails if e), None)
             if not email:
                 continue
             first = (info.get("name") or {}).get("first", "") or ""
-            labels = [k.get("key", "") for k in info.get("labelKeys", {}).get("items", [])]
+            raw_labels = info.get("labelKeys", {}).get("items", [])
+            labels = [l if isinstance(l, str) else l.get("key", "") for l in raw_labels]
             birthday = info.get("birthdate", "") or ""
             consented = int(any(config.CONSENT_LABEL in l for l in labels))
             row = con.execute(
