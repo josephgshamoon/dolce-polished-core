@@ -5,6 +5,7 @@ CLI:
   python -m dolce_mailer.campaigns send-approved      (cron entry)
 """
 import argparse
+import time
 from pathlib import Path
 
 from . import config, db, preflight, render, send
@@ -46,10 +47,13 @@ def send_approved():
         rows = con.execute("SELECT * FROM campaigns WHERE status='approved'").fetchall()
         for camp in rows:
             kind = f"campaign:{camp['id']}"
-            sent = 0
+            sent, remaining = 0, 0
             for c in db.eligible_contacts(con):
                 if con.execute("SELECT 1 FROM sends WHERE wix_id=? AND kind=?",
                                (c["wix_id"], kind)).fetchone():
+                    continue
+                if sent >= config.MAX_SENDS_PER_RUN:
+                    remaining += 1
                     continue
                 unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
                 send.send_email(c["email"], camp["subject"],
@@ -57,10 +61,15 @@ def send_approved():
                 con.execute("INSERT INTO sends (wix_id, kind) VALUES (?,?)",
                             (c["wix_id"], kind))
                 sent += 1
-            con.execute(
-                "UPDATE campaigns SET status='sent', sent_at=CURRENT_TIMESTAMP WHERE id=?",
-                (camp["id"],))
-            print(f"campaign {camp['id']} ({camp['name']}): sent to {sent}")
+                time.sleep(config.SEND_DELAY_SECONDS)
+            if remaining:
+                print(f"campaign {camp['id']} ({camp['name']}): {sent} sent this run, "
+                      f"{remaining} remaining - continues next run")
+            else:
+                con.execute(
+                    "UPDATE campaigns SET status='sent', sent_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (camp["id"],))
+                print(f"campaign {camp['id']} ({camp['name']}): complete, {sent} sent this run")
 
 
 if __name__ == "__main__":

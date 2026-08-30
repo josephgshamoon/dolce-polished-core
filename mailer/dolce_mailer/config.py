@@ -22,4 +22,9 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", FROM_EMAIL)
 SMTP_PASS = os.environ.get("SMTP_PASS", "")
 
+# Safety throttle: max emails per job run (cron spreads large batches over
+# multiple runs) and pause between sends.
+MAX_SENDS_PER_RUN = int(os.environ.get("MAX_SENDS_PER_RUN", "150"))
+SEND_DELAY_SECONDS = float(os.environ.get("SEND_DELAY_SECONDS", "1"))
+
 CONSENT_LABEL = "consented"
