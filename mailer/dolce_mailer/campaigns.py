@@ -17,20 +17,20 @@ def create(name: str, subject: str, html_path: str):
 
 
 def create_from_html(name: str, subject: str, html: str,
-                     heading: str = "", body_raw: str = ""):
+                     heading: str = "", body_raw: str = "", audience: str = "all"):
     token = db.new_token()
     with db.connect() as con:
         con.execute(
-            "INSERT INTO campaigns (name, subject, html, token, heading, body_raw) "
-            "VALUES (?,?,?,?,?,?)",
-            (name, subject, html, token, heading, body_raw))
-        n = len(db.eligible_contacts(con))
-    _send_review(name, subject, html, token, n)
+            "INSERT INTO campaigns (name, subject, html, token, heading, body_raw, audience) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (name, subject, html, token, heading, body_raw, audience))
+        n = len(db.eligible_contacts(con, audience))
+    _send_review(name, subject, html, token, n, audience)
     print(f"campaign '{name}' created; approval email sent to {config.APPROVER_EMAIL}")
 
 
 def update_campaign(cid: int, name: str, subject: str, html: str,
-                    heading: str, body_raw: str):
+                    heading: str, body_raw: str, audience: str = "all"):
     """Edit a pending campaign: new content, fresh token (old links die),
     back to pending, review emails re-sent."""
     token = db.new_token()
@@ -40,13 +40,17 @@ def update_campaign(cid: int, name: str, subject: str, html: str,
             raise ValueError("only pending campaigns can be edited")
         con.execute(
             "UPDATE campaigns SET name=?, subject=?, html=?, token=?, heading=?, "
-            "body_raw=?, status='pending' WHERE id=?",
-            (name, subject, html, token, heading, body_raw, cid))
-        n = len(db.eligible_contacts(con))
-    _send_review(name, subject, html, token, n)
+            "body_raw=?, audience=?, status='pending' WHERE id=?",
+            (name, subject, html, token, heading, body_raw, audience, cid))
+        n = len(db.eligible_contacts(con, audience))
+    _send_review(name, subject, html, token, n, audience)
 
 
-def _send_review(name, subject, html, token, n):
+AUDIENCE_LABELS = {"all": "All clients", "dolce": "Dolce (clinic)",
+                   "polished": "Polished (salon)", "core": "Core (studio)"}
+
+
+def _send_review(name, subject, html, token, n, audience="all"):
     approve = f"{config.APP_BASE_URL}/approve/{token}"
     reject = f"{config.APP_BASE_URL}/reject/{token}"
     preview_contact = {"first_name": "Maya", "unsub_token": "preview"}
@@ -59,6 +63,7 @@ def _send_review(name, subject, html, token, n):
         <h2 style="font-family:Georgia,serif;font-weight:normal;color:#2b2b2b;">
           Approve campaign: {name}</h2>
         <p style="color:#4a4a4a;">Subject: <b>{subject}</b><br>
+           Audience: <b>{AUDIENCE_LABELS.get(audience, audience)}</b><br>
            Recipients: <b>{n}</b> consented client(s).</p>
         <p style="color:#4a4a4a;">A test copy of the exact email was just sent to this
            inbox with the subject "[TEST] {subject}" - open it first and check how it looks.</p>
@@ -86,7 +91,9 @@ def send_approved():
         for camp in rows:
             kind = f"campaign:{camp['id']}"
             sent, remaining = 0, 0
-            for c in db.eligible_contacts(con):
+            keys = camp.keys()
+            camp_audience = camp["audience"] if "audience" in keys else "all"
+            for c in db.eligible_contacts(con, camp_audience):
                 if con.execute("SELECT 1 FROM sends WHERE wix_id=? AND kind=?",
                                (c["wix_id"], kind)).fetchone():
                     continue

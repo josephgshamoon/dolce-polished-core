@@ -160,6 +160,10 @@ ADMIN_PAGE = """
   label{display:block;font-size:11px;letter-spacing:2px;color:var(--gold);
         text-transform:uppercase;margin:22px 0 7px;}
   label:first-of-type{margin-top:0;}
+  select{width:100%;box-sizing:border-box;border:1px solid var(--field-border);
+        border-radius:8px;padding:13px 14px;font-size:15px;font-family:inherit;
+        color:var(--ink);background:var(--field);}
+  select:focus{outline:none;border-color:var(--gold);}
   input,textarea{width:100%;box-sizing:border-box;border:1px solid var(--field-border);
         border-radius:8px;padding:13px 14px;font-size:15px;font-family:inherit;
         color:var(--ink);background:var(--field);transition:border .15s;}
@@ -196,6 +200,15 @@ ADMIN_PAGE = """
     <form method="post" action="%%ACTION%%">
       <label>Campaign name <span style="color:#b5a7a9;text-transform:none;letter-spacing:0;">(just for you)</span></label>
       <input name="name" required placeholder="e.g. September glow offer" value="%%V_NAME%%">
+      <label>Audience</label>
+      <select name="audience">
+        <option value="all" %%SEL_all%%>All clients</option>
+        <option value="dolce" %%SEL_dolce%%>Dolce (clinic)</option>
+        <option value="polished" %%SEL_polished%%>Polished (salon)</option>
+        <option value="core" %%SEL_core%%>Core (studio)</option>
+      </select>
+      <div class="hint">Who receives it. Brands match labels on the client list -
+        clients without a brand label only receive "All clients" campaigns.</div>
       <label>Subject line</label>
       <input name="subject" required placeholder="e.g. A little something special for our clients" value="%%V_SUBJECT%%">
       <div class="hint">This is what appears in their inbox - keep it warm and short.</div>
@@ -301,6 +314,9 @@ def _render_admin(action="/admin/create", title="New campaign",
                       .replace("%%V_SUBJECT%%", html_mod.escape(v.get("subject", ""), quote=True))
                       .replace("%%V_HEADING%%", html_mod.escape(v.get("heading", ""), quote=True))
                       .replace("%%V_BODY%%", html_mod.escape(v.get("body", ""))))
+    aud = v.get("audience", "all")
+    for opt in ("all", "dolce", "polished", "core"):
+        page = page.replace(f"%%SEL_{opt}%%", "selected" if opt == aud else "")
     return HTMLResponse(page)
 
 
@@ -315,8 +331,10 @@ def admin_edit_form(cid: int, user: str = Depends(_admin)):
         r = con.execute("SELECT * FROM campaigns WHERE id=?", (cid,)).fetchone()
     if not r or r["status"] != "pending":
         return _page("Only campaigns still waiting for approval can be edited.")
+    keys = r.keys()
     vals = {"name": r["name"], "subject": r["subject"],
-            "heading": r["heading"] or "", "body": r["body_raw"] or ""}
+            "heading": r["heading"] or "", "body": r["body_raw"] or "",
+            "audience": (r["audience"] if "audience" in keys else "all") or "all"}
     return _render_admin(action=f"/admin/edit/{cid}", title="Edit campaign",
                          button="SAVE &amp; RESEND FOR APPROVAL", values=vals)
 
@@ -324,10 +342,11 @@ def admin_edit_form(cid: int, user: str = Depends(_admin)):
 @app.post("/admin/edit/{cid}")
 def admin_edit(cid: int, user: str = Depends(_admin), name: str = Form(...),
                subject: str = Form(...), heading: str = Form(...),
-               body: str = Form(...)):
+               body: str = Form(...), audience: str = Form("all")):
     try:
         campaigns.update_campaign(cid, name, subject,
-                                  _campaign_html(heading, body), heading, body)
+                                  _campaign_html(heading, body), heading, body,
+                                  audience=audience)
     except ValueError as e:
         return _page(str(e))
     return _page(f"Campaign <b>{html_mod.escape(name)}</b> updated. A fresh test copy "
@@ -361,9 +380,9 @@ def admin_cancel(cid: int, user: str = Depends(_admin)):
 @app.post("/admin/create")
 def admin_create(user: str = Depends(_admin), name: str = Form(...),
                  subject: str = Form(...), heading: str = Form(...),
-                 body: str = Form(...)):
+                 body: str = Form(...), audience: str = Form("all")):
     campaigns.create_from_html(name, subject, _campaign_html(heading, body),
-                               heading=heading, body_raw=body)
+                               heading=heading, body_raw=body, audience=audience)
     return _page(f"Your campaign <b>{html_mod.escape(name)}</b> is created.<br><br>"
                  f"Now check <b>{config.APPROVER_EMAIL}</b> - the approval email is on its "
                  "way. Nothing sends until you press Approve there.")

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     token       TEXT NOT NULL,            -- approval link token
     heading     TEXT DEFAULT '',
     body_raw    TEXT DEFAULT '',
+    audience    TEXT DEFAULT 'all',
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
     decided_at  TEXT,
     sent_at     TEXT
@@ -56,19 +57,25 @@ def init():
         if "heading" not in cols:
             con.execute("ALTER TABLE campaigns ADD COLUMN heading TEXT DEFAULT ''")
             con.execute("ALTER TABLE campaigns ADD COLUMN body_raw TEXT DEFAULT ''")
+        if "audience" not in cols:
+            con.execute("ALTER TABLE campaigns ADD COLUMN audience TEXT DEFAULT 'all'")
 
 
 def new_token():
     return secrets.token_urlsafe(24)
 
 
-def eligible_contacts(con):
-    """Contacts we are allowed to email: consented, not unsubscribed, not suppressed."""
-    return con.execute(
+def eligible_contacts(con, audience="all"):
+    """Contacts we are allowed to email: consented, not unsubscribed, not
+    suppressed - optionally narrowed to a brand audience (a Wix label)."""
+    rows = con.execute(
         """SELECT c.* FROM contacts c
            WHERE c.consented = 1 AND c.unsubscribed = 0
              AND c.email NOT IN (SELECT email FROM suppression)"""
     ).fetchall()
+    if audience and audience != "all":
+        rows = [r for r in rows if audience in (r["labels"] or "")]
+    return rows
 
 
 if __name__ == "__main__":
