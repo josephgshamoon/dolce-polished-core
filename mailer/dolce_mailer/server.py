@@ -151,6 +151,11 @@ ADMIN_PAGE = """
   h1{font-family:Georgia,serif;font-weight:normal;font-size:26px;color:var(--ink);
      margin:26px 0 6px;}
   .sub{color:var(--muted);font-size:14px;margin:0;}
+  .tabs{display:flex;gap:6px;justify-content:center;padding:16px 20px 0;
+        flex-wrap:wrap;background:var(--card);}
+  .tab{padding:8px 18px;border-radius:999px;font-size:13px;text-decoration:none;
+        color:var(--muted);border:1px solid var(--line);}
+  .tab.active{background:var(--gold);color:#fff;border-color:var(--gold);}
   .steps{display:flex;gap:8px;justify-content:center;padding:18px 20px;
          background:var(--chipbg);border-bottom:1px solid var(--line);flex-wrap:wrap;}
   .step{font-size:12.5px;color:var(--muted);background:var(--chip);
@@ -196,6 +201,7 @@ ADMIN_PAGE = """
       <h1>%%FORM_TITLE%%</h1>
       <p class="sub">Write it here - approve it from your inbox - we send it carefully.</p>
     </div>
+    <div class="tabs">%%TABS%%</div>
     <div class="steps">
       <span class="step"><b>1</b> Write &amp; create</span>
       <span class="step"><b>2</b> Approve from %%APPROVER%%</span>
@@ -204,15 +210,7 @@ ADMIN_PAGE = """
     <form method="post" action="%%ACTION%%">
       <label>Campaign name <span style="color:#b5a7a9;text-transform:none;letter-spacing:0;">(just for you)</span></label>
       <input name="name" required placeholder="e.g. September glow offer" value="%%V_NAME%%">
-      <label>Audience</label>
-      <select name="audience">
-        <option value="all" %%SEL_all%%>All clients</option>
-        <option value="dolce" %%SEL_dolce%%>Dolce (clinic)</option>
-        <option value="polished" %%SEL_polished%%>Polished (salon)</option>
-        <option value="core" %%SEL_core%%>Core (studio)</option>
-      </select>
-      <div class="hint">Who receives it. Brands match labels on the client list -
-        clients without a brand label only receive "All clients" campaigns.</div>
+      <input type="hidden" name="audience" value="%%AUD%%">
       <label>Subject line</label>
       <input name="subject" required placeholder="e.g. A little something special for our clients" value="%%V_SUBJECT%%">
       <div class="hint">This is what appears in their inbox - keep it warm and short.</div>
@@ -245,13 +243,23 @@ def _campaign_html(heading: str, body: str) -> str:
                  .replace("{{body}}", body_html))
 
 
+BRANDS = [("dolce", "Dolce"), ("polished", "Polished"),
+          ("core", "Core"), ("all", "Everyone")]
+BRAND_TITLES = {"dolce": "Dolce (clinic)", "polished": "Polished (salon)",
+                "core": "Core (studio)", "all": "Everyone"}
+
+
 def _render_admin(action="/admin/create", title="New campaign",
-                  button="CREATE CAMPAIGN", values=None):
+                  button="CREATE CAMPAIGN", values=None, brand="dolce"):
     v = values or {}
+    tabs = "".join(
+        f"<a class='tab{' active' if key == brand else ''}' "
+        f"href='/admin?brand={key}'>{label}</a>" for key, label in BRANDS)
     with db.connect() as con:
         rows = con.execute(
-            "SELECT id, name, status, created_at FROM campaigns ORDER BY id DESC LIMIT 10"
-        ).fetchall()
+            "SELECT id, name, status, created_at FROM campaigns "
+            "WHERE COALESCE(audience,'all') = ? ORDER BY id DESC LIMIT 10",
+            (brand,)).fetchall()
     if rows:
         parts = []
         for r in rows:
@@ -278,7 +286,8 @@ def _render_admin(action="/admin/create", title="New campaign",
                 f"<span class='when'>{r['created_at'][:16]}</span></div>")
         recent = "".join(parts)
     else:
-        recent = "<p style='color:#a99a9c;font-size:14px;'>Nothing yet - your first campaign will appear here.</p>"
+        recent = ("<p style='color:#a99a9c;font-size:14px;'>No "
+                  f"{BRAND_TITLES[brand]} campaigns yet.</p>")
     today = date.today()
     upcoming = []
     with db.connect() as con:
@@ -308,7 +317,9 @@ def _render_admin(action="/admin/create", title="New campaign",
         bd = ("<p style='color:#a99a9c;font-size:14px;'>No birthdays in the next 30 days. "
               "Birthday dates come from the client list - once the full list is imported, "
               "they appear here.</p>")
-    page = (ADMIN_PAGE.replace("%%APPROVER%%", config.APPROVER_EMAIL)
+    page = (ADMIN_PAGE.replace("%%TABS%%", tabs)
+                      .replace("%%AUD%%", brand)
+                      .replace("%%APPROVER%%", config.APPROVER_EMAIL)
                       .replace("%%RECENT%%", recent)
                       .replace("%%BIRTHDAYS%%", bd)
                       .replace("%%ACTION%%", action)
@@ -318,9 +329,6 @@ def _render_admin(action="/admin/create", title="New campaign",
                       .replace("%%V_SUBJECT%%", html_mod.escape(v.get("subject", ""), quote=True))
                       .replace("%%V_HEADING%%", html_mod.escape(v.get("heading", ""), quote=True))
                       .replace("%%V_BODY%%", html_mod.escape(v.get("body", ""))))
-    aud = v.get("audience", "all")
-    for opt in ("all", "dolce", "polished", "core"):
-        page = page.replace(f"%%SEL_{opt}%%", "selected" if opt == aud else "")
     return HTMLResponse(page)
 
 
@@ -335,8 +343,10 @@ def admin_logout():
 
 
 @app.get("/admin")
-def admin_form(user: str = Depends(_admin)):
-    return _render_admin()
+def admin_form(user: str = Depends(_admin), brand: str = "dolce"):
+    if brand not in BRAND_TITLES:
+        brand = "dolce"
+    return _render_admin(title=f"New campaign - {BRAND_TITLES[brand]}", brand=brand)
 
 
 @app.get("/admin/edit/{cid}")
@@ -346,11 +356,14 @@ def admin_edit_form(cid: int, user: str = Depends(_admin)):
     if not r or r["status"] != "pending":
         return _page("Only campaigns still waiting for approval can be edited.")
     keys = r.keys()
+    aud = (r["audience"] if "audience" in keys else "all") or "all"
     vals = {"name": r["name"], "subject": r["subject"],
             "heading": r["heading"] or "", "body": r["body_raw"] or "",
-            "audience": (r["audience"] if "audience" in keys else "all") or "all"}
-    return _render_admin(action=f"/admin/edit/{cid}", title="Edit campaign",
-                         button="SAVE &amp; RESEND FOR APPROVAL", values=vals)
+            "audience": aud}
+    return _render_admin(action=f"/admin/edit/{cid}",
+                         title=f"Edit campaign - {BRAND_TITLES.get(aud, aud)}",
+                         button="SAVE &amp; RESEND FOR APPROVAL", values=vals,
+                         brand=aud)
 
 
 @app.post("/admin/edit/{cid}")
