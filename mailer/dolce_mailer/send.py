@@ -31,7 +31,8 @@ def _send_smtp(to_email: str, subject: str, html: str, unsub_url: str | None = N
     msg.attach(MIMEText(html, "html", "utf-8"))
     with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30) as server:
         server.starttls()
-        server.login(config.SMTP_USER, config.SMTP_PASS)
+        if config.SMTP_PASS:  # Google SMTP relay authenticates by allowed IP; no login needed
+            server.login(config.SMTP_USER, config.SMTP_PASS)
         server.send_message(msg)
     return {"transport": "smtp", "to": to_email}
 
