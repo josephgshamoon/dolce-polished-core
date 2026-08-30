@@ -17,11 +17,23 @@
 - Current consented list: Joseph, Maya, Kawa (3). The other ~39 Wix contacts
   are unlabeled = unreachable by the system.
 
+## Targeting model (final, live)
+- TWO KEYS required for any send: `consented` (permission) + at least one
+  brand label (`dolce`/`polished`/`core` = membership). consented alone
+  sends NOTHING. Labels stack for multi-business clients.
+- Portal tabs: Dolce (default, only tab with the logo) / Polished / Core /
+  Everyone. Brand tab -> that brand's labeled clients; Everyone -> all
+  clients with at least one brand label. Rows are clickable: view rendered
+  email, edit (pending), cancel (approved), duplicate (any).
+- Failure alerting: job crashes, per-send failures, portal errors email
+  jshamoon30@gmail.com (same-subject alerts muted 6h).
+
 ## Tomorrow / next session
-1. Maya reviews the 39 in Wix, unticks non-clients, bulk Add Label
-   `consented` -> welcomes go out automatically. Check ~/dolce/mailer.log.
+1. Maya reviews the 39 in Wix, unticks non-clients, then TWO bulk actions:
+   Add Label `consented` AND Add Label `dolce` -> welcomes go out
+   automatically. Check ~/dolce/mailer.log and the approval-count habit.
 2. Phoenix export -> upload to the working session -> cleaned wave files
-   (consented split, brand labels dolce/polished/core, birthdays YYYY-MM-DD)
+   (each wave labeled `consented` + `dolce`, birthdays YYYY-MM-DD)
    -> Wix imports with batch labels.
 3. Maya, 10 min, logged in as dolce.erbil@gmail.com:
    - search.google.com/search-console : what properties exist?
