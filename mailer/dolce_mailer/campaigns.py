@@ -26,19 +26,28 @@ def create_from_html(name: str, subject: str, html: str):
         n = len(db.eligible_contacts(con))
     approve = f"{config.APP_BASE_URL}/approve/{token}"
     reject = f"{config.APP_BASE_URL}/reject/{token}"
+    # 1) a real rendered test copy, so the approver sees exactly what clients get
+    preview_contact = {"first_name": "Maya", "unsub_token": "preview"}
+    send.send_email(config.APPROVER_EMAIL, f"[TEST] {subject}",
+                    render.render(html, preview_contact))
+    # 2) the short approval email with the buttons
     notice = f"""
-      <div style="font-family:Arial,sans-serif; padding:16px;">
-        <h2>Campaign approval needed: {name}</h2>
-        <p>Subject: <b>{subject}</b> - would send to <b>{n}</b> consented contacts.</p>
-        <p>
-          <a href="{approve}" style="background:#2e7d32;color:#fff;padding:12px 24px;
-             text-decoration:none;border-radius:4px;">APPROVE &amp; SEND</a>
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+        <h2 style="font-family:Georgia,serif;font-weight:normal;color:#2b2b2b;">
+          Approve campaign: {name}</h2>
+        <p style="color:#4a4a4a;">Subject: <b>{subject}</b><br>
+           Recipients: <b>{n}</b> consented client(s).</p>
+        <p style="color:#4a4a4a;">A test copy of the exact email was just sent to this
+           inbox with the subject "[TEST] {subject}" - open it first and check how it looks.</p>
+        <p style="margin:28px 0;">
+          <a href="{approve}" style="background:#2e7d32;color:#fff;padding:14px 26px;
+             text-decoration:none;border-radius:6px;">APPROVE &amp; SEND</a>
           &nbsp;&nbsp;
-          <a href="{reject}" style="background:#c62828;color:#fff;padding:12px 24px;
-             text-decoration:none;border-radius:4px;">REJECT</a>
+          <a href="{reject}" style="background:#c62828;color:#fff;padding:14px 26px;
+             text-decoration:none;border-radius:6px;">REJECT</a>
         </p>
-        <p>Preview below (placeholders shown unmerged):</p>
-        <hr>{html}
+        <p style="color:#a99a9c;font-size:12px;">Nothing sends until you press Approve.
+           Approved campaigns go out within 5 minutes, in gentle batches.</p>
       </div>"""
     send.send_email(config.APPROVER_EMAIL, f"[APPROVAL NEEDED] {name}", notice)
     print(f"campaign {campaign_id} created; approval email sent to {config.APPROVER_EMAIL}")

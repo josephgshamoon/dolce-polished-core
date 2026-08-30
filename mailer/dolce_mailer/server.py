@@ -1,6 +1,7 @@
 """Web endpoints: campaign approve/reject, one-click unsubscribe, Brevo webhook."""
 import html as html_mod
 import secrets as pysecrets
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
@@ -173,6 +174,10 @@ ADMIN_PAGE = """
       <button type="submit">CREATE CAMPAIGN</button>
     </form>
     <div class="recent">
+      <h2>Upcoming birthdays <span style="font-size:12px;color:#b5a7a9;">(next 30 days)</span></h2>
+      %%BIRTHDAYS%%
+    </div>
+    <div class="recent">
       <h2>Recent campaigns</h2>
       %%RECENT%%
     </div>
@@ -197,7 +202,38 @@ def admin_form(user: str = Depends(_admin)):
         recent = "".join(parts)
     else:
         recent = "<p style='color:#a99a9c;font-size:14px;'>Nothing yet - your first campaign will appear here.</p>"
-    page = ADMIN_PAGE.replace("%%APPROVER%%", config.APPROVER_EMAIL).replace("%%RECENT%%", recent)
+    today = date.today()
+    upcoming = []
+    with db.connect() as con:
+        for c in db.eligible_contacts(con):
+            b = (c["birthday"] or "")[5:10]
+            if len(b) != 5:
+                continue
+            try:
+                nxt = date(today.year, int(b[:2]), int(b[3:]))
+            except ValueError:
+                continue
+            if nxt < today:
+                nxt = date(today.year + 1, int(b[:2]), int(b[3:]))
+            days = (nxt - today).days
+            if days <= 30:
+                upcoming.append((days, nxt, c["first_name"] or c["email"]))
+    upcoming.sort()
+    if upcoming:
+        bd = "".join(
+            f"<div class='row'><span>{html_mod.escape(str(nm))}</span>"
+            f"<span class='when'>{d.strftime('%d %b')}"
+            f"{' - today!' if days == 0 else f' (in {days}d)'}</span></div>"
+            for days, d, nm in upcoming)
+        bd += ("<p style='color:#a99a9c;font-size:12.5px;margin-top:10px;'>Each of them "
+               "automatically receives the birthday email on the day - nothing to do.</p>")
+    else:
+        bd = ("<p style='color:#a99a9c;font-size:14px;'>No birthdays in the next 30 days. "
+              "Birthday dates come from the client list - once the full list is imported, "
+              "they appear here.</p>")
+    page = (ADMIN_PAGE.replace("%%APPROVER%%", config.APPROVER_EMAIL)
+                      .replace("%%RECENT%%", recent)
+                      .replace("%%BIRTHDAYS%%", bd))
     return HTMLResponse(page)
 
 
