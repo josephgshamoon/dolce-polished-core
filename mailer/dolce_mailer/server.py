@@ -1,5 +1,6 @@
 """Web endpoints: campaign approve/reject, one-click unsubscribe, Brevo webhook."""
 import html as html_mod
+import re
 import secrets as pysecrets
 import traceback
 from datetime import date, timedelta
@@ -10,7 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import alerts, campaigns, config, db
+from . import alerts, campaigns, config, db, render
 
 basic = HTTPBasic()
 
@@ -291,7 +292,9 @@ def _render_admin(action="/admin/create", title="New campaign",
                            f"style='display:inline'><button style='all:unset;color:#c96060;"
                            f"font-size:12px;cursor:pointer;'>delete</button></form>")
             parts.append(
-                f"<div class='row'><span>{html_mod.escape(r['name'])}</span>"
+                f"<div class='row'><span><a href='/admin/view/{r['id']}' "
+                f"style='color:inherit;text-decoration:none;border-bottom:1px dotted "
+                f"var(--gold);'>{html_mod.escape(r['name'])}</a></span>"
                 f"<span>{actions}</span>"
                 f"<span class='pill' style='color:{fg}'>{r['status']}</span>"
                 f"<span class='when'>{r['created_at'][:16]}</span></div>")
@@ -395,6 +398,89 @@ def admin_edit(cid: int, user: str = Depends(_admin), name: str = Form(...),
     return _page(f"Campaign <b>{html_mod.escape(name)}</b> updated. A fresh test copy "
                  f"and approval email are on their way to {config.APPROVER_EMAIL}; "
                  "the previous approval links no longer work.")
+
+
+@app.get("/admin/view/{cid}")
+def admin_view(cid: int, user: str = Depends(_admin)):
+    with db.connect() as con:
+        r = con.execute("SELECT * FROM campaigns WHERE id=?", (cid,)).fetchone()
+    if not r:
+        return _page("Campaign not found.")
+    keys = r.keys()
+    aud = (r["audience"] if "audience" in keys else "all") or "all"
+    preview_html = render.render(r["html"], {"first_name": "Maya",
+                                             "unsub_token": "preview"})
+    m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
+    inner = m.group(1) if m else preview_html
+    st = r["status"]
+    btn = ("display:inline-block;padding:10px 22px;border-radius:8px;"
+           "text-decoration:none;font-size:13px;letter-spacing:1px;")
+    acts = []
+    if st == "pending":
+        acts.append(f"<a href='/admin/edit/{cid}' style='{btn}background:#c2a273;"
+                    f"color:#fff;'>EDIT</a>")
+    if st == "approved":
+        acts.append(f"<form method='post' action='/admin/cancel/{cid}' "
+                    f"style='display:inline'><button style='{btn}background:#c96060;"
+                    f"color:#fff;border:0;cursor:pointer;'>CANCEL SEND</button></form>")
+    acts.append(f"<a href='/admin/duplicate/{cid}' style='{btn}background:transparent;"
+                f"border:1px solid #c2a273;color:#c2a273;'>DUPLICATE</a>")
+    note = ""
+    if st == "sent":
+        note = ("<p style='color:#a99a9c;font-size:12.5px;'>Sent campaigns are kept "
+                "as history and can't be edited - use Duplicate to reuse it as a "
+                "new draft.</p>")
+    fg = STATUS_COLORS.get(st, "#8a8a8a")
+    return HTMLResponse(f"""
+<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>{html_mod.escape(r['name'])}</title>
+<link rel='icon' type='image/png' href='/static/dolce-logo.png'>
+<style>
+  :root{{--page:#f5eff0;--card:#fff;--ink:#2b2b2b;--body:#4a4a4a;--gold:#c2a273;
+        --faint:#a99a9c;--line:#ead9dc;}}
+  @media (prefers-color-scheme: dark){{
+    :root{{--page:#191516;--card:#231e1f;--ink:#f0e9e6;--body:#cfc5c2;
+          --gold:#d0b285;--faint:#877b7d;--line:#3a3132;}}}}
+  body{{margin:0;background:var(--page);font-family:Arial,sans-serif;color:var(--body);}}
+</style>
+<body>
+  <div style="max-width:660px;margin:30px auto;padding:0 14px;">
+    <p><a href="/admin" style="color:var(--gold);text-decoration:none;
+       font-size:13px;">&larr; Back to campaigns</a></p>
+    <div style="background:var(--card);border-radius:12px;padding:26px 30px;">
+      <h1 style="font-family:Georgia,serif;font-weight:normal;font-size:23px;
+          color:var(--ink);margin:0 0 6px;">{html_mod.escape(r['name'])}</h1>
+      <p style="font-size:13.5px;color:var(--faint);margin:0 0 18px;">
+        Subject: {html_mod.escape(r['subject'])} &nbsp;&middot;&nbsp;
+        <span style="color:{fg};text-transform:uppercase;font-size:11px;
+        letter-spacing:1px;border:1px solid currentColor;border-radius:999px;
+        padding:3px 10px;">{st}</span> &nbsp;&middot;&nbsp; {r['created_at'][:16]}</p>
+      <p style="margin:0 0 8px;">{''.join(acts)}</p>
+      {note}
+    </div>
+    <p style="font-family:Georgia,serif;color:var(--ink);font-size:16px;
+       margin:24px 0 8px;">How it looks to clients:</p>
+    <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden;
+         background:#f5eff0;">{inner}</div>
+  </div>
+</body>""")
+
+
+@app.get("/admin/duplicate/{cid}")
+def admin_duplicate(cid: int, user: str = Depends(_admin)):
+    with db.connect() as con:
+        r = con.execute("SELECT * FROM campaigns WHERE id=?", (cid,)).fetchone()
+    if not r:
+        return _page("Campaign not found.")
+    keys = r.keys()
+    aud = (r["audience"] if "audience" in keys else "all") or "all"
+    vals = {"name": f"{r['name']} (copy)", "subject": r["subject"],
+            "heading": (r["heading"] if "heading" in keys else "") or "",
+            "body": (r["body_raw"] if "body_raw" in keys else "") or "",
+            "audience": aud}
+    return _render_admin(action="/admin/create", title="Duplicate campaign",
+                         button="CREATE CAMPAIGN", values=vals, brand=aud)
 
 
 @app.post("/admin/delete/{cid}")
