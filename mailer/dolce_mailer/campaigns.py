@@ -12,7 +12,10 @@ from . import config, db, preflight, render, send
 
 
 def create(name: str, subject: str, html_path: str):
-    html = Path(html_path).read_text()
+    return create_from_html(name, subject, Path(html_path).read_text())
+
+
+def create_from_html(name: str, subject: str, html: str):
     token = db.new_token()
     with db.connect() as con:
         cur = con.execute(

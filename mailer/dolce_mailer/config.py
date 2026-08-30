@@ -27,4 +27,9 @@ SMTP_PASS = os.environ.get("SMTP_PASS", "")
 MAX_SENDS_PER_RUN = int(os.environ.get("MAX_SENDS_PER_RUN", "150"))
 SEND_DELAY_SECONDS = float(os.environ.get("SEND_DELAY_SECONDS", "1"))
 
+# Admin page (campaign creation without the CLI). Disabled until
+# ADMIN_PASSWORD is set in .env.
+ADMIN_USER = os.environ.get("ADMIN_USER", "maya")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+
 CONSENT_LABEL = "consented"
