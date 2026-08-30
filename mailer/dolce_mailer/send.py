@@ -24,5 +24,6 @@ def send_email(to_email: str, subject: str, html: str, unsub_url: str | None = N
     r = httpx.post(API, json=payload, timeout=30,
                    headers={"api-key": config.BREVO_API_KEY,
                             "Content-Type": "application/json"})
-    r.raise_for_status()
+    if r.status_code >= 400:
+        raise RuntimeError(f"Brevo refused the send ({r.status_code}): {r.text[:500]}")
     return r.json()
