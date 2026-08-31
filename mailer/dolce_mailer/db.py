@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     wix_id      TEXT PRIMARY KEY,
     email       TEXT NOT NULL,
     first_name  TEXT DEFAULT '',
+    last_name   TEXT DEFAULT '',
     labels      TEXT DEFAULT '',          -- comma-separated wix labels
     birthday    TEXT DEFAULT '',          -- YYYY-MM-DD if known
     consented   INTEGER DEFAULT 0,
@@ -73,6 +74,9 @@ def connect():
 def init():
     with connect() as con:
         con.executescript(SCHEMA)
+        ccols = [r[1] for r in con.execute("PRAGMA table_info(contacts)")]
+        if "last_name" not in ccols:
+            con.execute("ALTER TABLE contacts ADD COLUMN last_name TEXT DEFAULT ''")
         cols = [r[1] for r in con.execute("PRAGMA table_info(campaigns)")]
         if "heading" not in cols:
             con.execute("ALTER TABLE campaigns ADD COLUMN heading TEXT DEFAULT ''")

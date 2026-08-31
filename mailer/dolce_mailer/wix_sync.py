@@ -45,6 +45,7 @@ def upsert(raw_contacts):
             if not email:
                 continue
             first = (info.get("name") or {}).get("first", "") or ""
+            last = (info.get("name") or {}).get("last", "") or ""
             raw_labels = info.get("labelKeys", {}).get("items", [])
             labels = [l if isinstance(l, str) else l.get("key", "") for l in raw_labels]
             birthday = info.get("birthdate", "") or ""
@@ -54,17 +55,19 @@ def upsert(raw_contacts):
             ).fetchone()
             if row:
                 con.execute(
-                    """UPDATE contacts SET email=?, first_name=?, labels=?,
-                       birthday=?, consented=? WHERE wix_id=?""",
-                    (email, first, ",".join(labels), birthday, consented, c["id"]),
+                    """UPDATE contacts SET email=?, first_name=?, last_name=?,
+                       labels=?, birthday=?, consented=? WHERE wix_id=?""",
+                    (email, first, last, ",".join(labels), birthday, consented,
+                     c["id"]),
                 )
             else:
                 con.execute(
                     """INSERT INTO contacts
-                       (wix_id, email, first_name, labels, birthday, consented, unsub_token)
-                       VALUES (?,?,?,?,?,?,?)""",
-                    (c["id"], email, first, ",".join(labels), birthday, consented,
-                     db.new_token()),
+                       (wix_id, email, first_name, last_name, labels, birthday,
+                        consented, unsub_token)
+                       VALUES (?,?,?,?,?,?,?,?)""",
+                    (c["id"], email, first, last, ",".join(labels), birthday,
+                     consented, db.new_token()),
                 )
                 added += 1
     return added

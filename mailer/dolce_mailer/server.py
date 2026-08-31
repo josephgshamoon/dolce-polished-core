@@ -298,6 +298,12 @@ ADMIN_PAGE = """
 </body>"""
 
 
+def _full_name(r) -> str:
+    keys = r.keys() if hasattr(r, "keys") else []
+    last = (r["last_name"] if "last_name" in keys else "") or ""
+    return f"{((r['first_name'] or '').strip())} {last.strip()}".strip()
+
+
 def _campaign_html(heading: str, body: str, audience: str = "all") -> str:
     paragraphs = [html_mod.escape(pp.strip()).replace("\n", "<br>")
                   for pp in body.replace("\r", "").split("\n\n") if pp.strip()]
@@ -397,7 +403,7 @@ def _render_admin(action="/admin/create", title="New campaign",
                 nxt = date(today.year + 1, int(b[:2]), int(b[3:]))
             days = (nxt - today).days
             if days <= 30:
-                upcoming.append((days, nxt, c["first_name"] or c["email"]))
+                upcoming.append((days, nxt, _full_name(c) or c["email"]))
     upcoming.sort()
     if upcoming:
         bd = "".join(
@@ -515,7 +521,7 @@ border-bottom:1px solid var(--line);font-size:14.5px;}}
 def unsubscribed_list(user: str = Depends(_admin)):
     with db.connect() as con:
         unsubbed = con.execute(
-            "SELECT first_name, email, labels FROM contacts "
+            "SELECT first_name, last_name, email, labels FROM contacts "
             "WHERE unsubscribed=1 ORDER BY first_name COLLATE NOCASE").fetchall()
         suppressed = con.execute(
             "SELECT email, reason FROM suppression ORDER BY email").fetchall()
@@ -524,7 +530,7 @@ def unsubscribed_list(user: str = Depends(_admin)):
         return ", ".join(found) or "-"
     if unsubbed:
         rows = "".join(
-            f"<div class='row'><span>{html_mod.escape(r['first_name'] or '')}</span>"
+            f"<div class='row'><span>{html_mod.escape(_full_name(r))}</span>"
             f"<span style='color:var(--faint)'>{html_mod.escape(r['email'] or '')}</span>"
             f"<span class='when'>{_brands(r['labels'])}</span></div>"
             for r in unsubbed)
@@ -854,7 +860,7 @@ def admin_view(cid: int, user: str = Depends(_admin)):
     st = r["status"]
     with db.connect() as con:
         recipients = con.execute(
-            """SELECT s.wix_id, s.sent_at, c.first_name, c.email FROM sends s
+            """SELECT s.wix_id, s.sent_at, c.first_name, c.last_name, c.email FROM sends s
                LEFT JOIN contacts c ON c.wix_id = s.wix_id
                WHERE s.kind = ? ORDER BY s.sent_at""",
             (f"campaign:{cid}",)).fetchall()
@@ -866,7 +872,7 @@ def admin_view(cid: int, user: str = Depends(_admin)):
         rec_rows = "".join(
             f"<div style='display:flex;justify-content:space-between;gap:10px;"
             f"padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;'>"
-            f"<span>{html_mod.escape(rc['first_name'] or '')}</span>"
+            f"<span>{html_mod.escape(_full_name(rc))}</span>"
             f"<span style='color:var(--faint)'>{html_mod.escape(rc['email'] or 'contact removed')}</span>"
             f"<span style='color:var(--faint);white-space:nowrap'>{_erbil(rc['sent_at'])}</span></div>"
             for rc in recipients)
@@ -891,7 +897,7 @@ def admin_view(cid: int, user: str = Depends(_admin)):
             pl_rows = "".join(
                 f"<div style='display:flex;justify-content:space-between;gap:10px;"
                 f"padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;'>"
-                f"<span>{html_mod.escape(pc['first_name'] or '')}</span>"
+                f"<span>{html_mod.escape(_full_name(pc))}</span>"
                 f"<span style='color:var(--faint)'>{html_mod.escape(pc['email'] or '')}</span>"
                 + ("<span style='color:#5aa860;white-space:nowrap'>already received"
                    "</span>" if pc["wix_id"] in sent_ids else "<span></span>")
