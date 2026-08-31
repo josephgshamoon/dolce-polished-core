@@ -120,11 +120,6 @@ def eligible_contacts(con, audience="all"):
             if any(b in (r["labels"] or "") for b in BRAND_KEYS)]
 
 
-if __name__ == "__main__":
-    init()
-    print("database initialised")
-
-
 AUTO_SEEDS = {
     "welcome:dolce": ("Welcome to Dolce", "Welcome to Dolce",
         "Welcome to Dolce. We're so happy to have you with us.\n\n"
@@ -166,3 +161,9 @@ def _seed_auto_templates(con):
         con.execute("INSERT OR IGNORE INTO auto_templates "
                     "(key, subject, heading, body_raw) VALUES (?,?,?,?)",
                     (key, subject, heading, body))
+
+
+if __name__ == "__main__":
+    init()
+    print("database initialised")
+
