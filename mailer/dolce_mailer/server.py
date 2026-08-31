@@ -242,8 +242,9 @@ ADMIN_PAGE = """
           style="all:unset;cursor:pointer;font-size:12px;color:var(--gold);
                  border:1px solid var(--gold);border-radius:999px;padding:4px 12px;">
           + client's first name</button>
-        <span style="font-size:11.5px;color:var(--faint);">works in the subject,
-          heading and message - becomes each client's own name</span>
+        <span style="font-size:11.5px;color:var(--faint);">inserts into whichever
+          field you last clicked (subject, heading or message) - becomes each
+          client's own name</span>
       </div>
       <textarea name="body" rows="9" required
         placeholder="Write naturally, like a note to a client.&#10;&#10;Leave a blank line to start a new paragraph. Every email automatically starts with the client's name and ends with the WhatsApp button and your clinic details.">%%V_BODY%%</textarea>
@@ -261,9 +262,14 @@ ADMIN_PAGE = """
         <button type="submit" style="margin-top:0;">%%BUTTON%%</button>
       </div>
       <script>
+        var phTarget=document.querySelector("textarea[name=body]");
+        ["subject","heading","body"].forEach(function(n){
+          var el=document.querySelector("[name="+n+"]");
+          if(el){ el.addEventListener("focus",function(){ phTarget=el; }); }
+        });
         function insertPh(t){
-          var el=document.querySelector("textarea[name=body]");
-          var a=el.selectionStart||0, b=el.selectionEnd||0;
+          var el=phTarget||document.querySelector("textarea[name=body]");
+          var a=el.selectionStart||el.value.length, b=el.selectionEnd||a;
           el.value=el.value.slice(0,a)+t+el.value.slice(b);
           el.focus(); el.selectionStart=el.selectionEnd=a+t.length;
         }
