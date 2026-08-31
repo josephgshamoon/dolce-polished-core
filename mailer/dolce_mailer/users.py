@@ -45,6 +45,13 @@ def add(username: str, email: str, password: str | None = None) -> str:
     return pw
 
 
+def set_email(username: str, email: str) -> bool:
+    with db.connect() as con:
+        cur = con.execute("UPDATE users SET email=? WHERE username=?",
+                          (email, username.lower().strip()))
+        return cur.rowcount > 0
+
+
 def set_password(username: str, pw: str) -> bool:
     with db.connect() as con:
         cur = con.execute("UPDATE users SET pw_hash=? WHERE username=?",
@@ -58,12 +65,15 @@ if __name__ == "__main__":
     a = sub.add_parser("add"); a.add_argument("username"); a.add_argument("email")
     sp = sub.add_parser("set-password"); sp.add_argument("username")
     sp.add_argument("--password")
+    se = sub.add_parser("set-email"); se.add_argument("username"); se.add_argument("email")
     sub.add_parser("list")
     args = p.parse_args()
     if args.cmd == "add":
         pw = add(args.username, args.email)
         print(f"user '{args.username}' created. TEMPORARY PASSWORD (share once, "
               f"have them change it on the portal): {pw}")
+    elif args.cmd == "set-email":
+        print("updated" if set_email(args.username, args.email) else "no such user")
     elif args.cmd == "set-password":
         pw = args.password or getpass.getpass("new password: ")
         print("updated" if set_password(args.username, pw) else "no such user")
