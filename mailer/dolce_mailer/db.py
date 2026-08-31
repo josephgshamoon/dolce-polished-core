@@ -37,6 +37,17 @@ CREATE TABLE IF NOT EXISTS campaigns (
     decided_at  TEXT,
     sent_at     TEXT
 );
+CREATE TABLE IF NOT EXISTS users (
+    username    TEXT PRIMARY KEY,
+    email       TEXT NOT NULL,
+    pw_hash     TEXT NOT NULL,
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS reset_tokens (
+    token       TEXT PRIMARY KEY,
+    username    TEXT NOT NULL,
+    expires     TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS suppression (
     email       TEXT PRIMARY KEY,
     reason      TEXT,                     -- bounce | complaint | manual
@@ -63,6 +74,15 @@ def init():
         if "scheduled_at" not in cols:
             con.execute("ALTER TABLE campaigns ADD COLUMN scheduled_at TEXT")
         con.execute("UPDATE sends SET kind='welcome:dolce' WHERE kind='welcome'")
+        # bootstrap: seed the first portal user from the legacy env credential
+        if not con.execute("SELECT 1 FROM users LIMIT 1").fetchone():
+            if config.ADMIN_PASSWORD:
+                from . import users as _users
+                con.execute(
+                    "INSERT INTO users (username, email, pw_hash) VALUES (?,?,?)",
+                    (config.ADMIN_USER.lower(), config.APPROVER_EMAIL,
+                     _users.hash_pw(config.ADMIN_PASSWORD)))
+                print(f"seeded portal user '{config.ADMIN_USER}' from .env password")
 
 
 def new_token():

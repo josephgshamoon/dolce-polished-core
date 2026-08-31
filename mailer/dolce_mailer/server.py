@@ -11,19 +11,21 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
-from . import alerts, campaigns, config, db, render
+from . import alerts, campaigns, config, db, render, send, users
 
 basic = HTTPBasic()
 
 
 def _admin(creds: HTTPBasicCredentials = Depends(basic)):
-    if not config.ADMIN_PASSWORD:
-        raise HTTPException(503, "Admin page disabled: set ADMIN_PASSWORD in .env")
-    ok = (pysecrets.compare_digest(creds.username, config.ADMIN_USER)
-          and pysecrets.compare_digest(creds.password, config.ADMIN_PASSWORD))
-    if not ok:
-        raise HTTPException(401, "Wrong login", headers={"WWW-Authenticate": "Basic"})
-    return creds.username
+    row = users.get(creds.username)
+    if row and users.verify(creds.password, row["pw_hash"]):
+        return row["username"]
+    if config.ADMIN_PASSWORD:  # legacy env credential still works as fallback
+        ok = (pysecrets.compare_digest(creds.username, config.ADMIN_USER)
+              and pysecrets.compare_digest(creds.password, config.ADMIN_PASSWORD))
+        if ok:
+            return creds.username
+    raise HTTPException(401, "Wrong login", headers={"WWW-Authenticate": "Basic"})
 
 app = FastAPI(title="Dolce Mailer")
 
@@ -207,6 +209,7 @@ ADMIN_PAGE = """
   <div class="card">
     <div style="display:flex;justify-content:flex-end;gap:14px;padding:12px 16px 0;">
       <a href="/admin" style="font-size:12px;color:var(--muted);text-decoration:none;">&#8635; Refresh</a>
+      <a href="/admin/password" style="font-size:12px;color:var(--muted);text-decoration:none;">Password</a>
       <a href="/admin/logout" style="font-size:12px;color:var(--muted);text-decoration:none;">Log out</a>
     </div>
     <div class="head">
@@ -394,6 +397,132 @@ def _render_admin(action="/admin/create", title="New campaign",
                       .replace("%%V_SCHED%%", html_mod.escape(v.get("schedule_local", ""), quote=True))
                       .replace("%%V_BODY%%", html_mod.escape(v.get("body", ""))))
     return HTMLResponse(page)
+
+
+_FORM_CSS = """
+<style>
+  :root{--page:#f5eff0;--card:#fff;--ink:#2b2b2b;--body:#4a4a4a;--gold:#c2a273;
+        --faint:#a99a9c;--line:#ead9dc;--field:#fdfbfb;--fb:#e2d3d6;}
+  @media (prefers-color-scheme: dark){
+    :root{--page:#191516;--card:#231e1f;--ink:#f0e9e6;--body:#cfc5c2;
+          --gold:#d0b285;--faint:#877b7d;--line:#3a3132;--field:#2b2526;--fb:#463c3d;}}
+  body{margin:0;background:var(--page);font-family:Arial,sans-serif;color:var(--body);}
+  .card{max-width:440px;margin:9vh auto;background:var(--card);border-radius:10px;
+        padding:36px 32px;}
+  h2{font-family:Georgia,serif;font-weight:normal;color:var(--ink);margin:0 0 18px;}
+  label{display:block;font-size:11px;letter-spacing:2px;color:var(--gold);
+        text-transform:uppercase;margin:16px 0 6px;}
+  input{width:100%;box-sizing:border-box;border:1px solid var(--fb);border-radius:8px;
+        padding:12px;font-size:15px;background:var(--field);color:var(--ink);}
+  button{width:100%;margin-top:24px;background:var(--gold);color:#fff;border:0;
+        border-radius:8px;padding:14px;font-size:14px;letter-spacing:1px;cursor:pointer;}
+</style>"""
+
+
+@app.get("/admin/password")
+def password_form(user: str = Depends(_admin)):
+    return HTMLResponse(f"""<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Change password</title>{_FORM_CSS}
+<body><div class='card'><h2>Change password</h2>
+<form method='post' action='/admin/password'>
+  <label>Current password</label><input type='password' name='current' required>
+  <label>New password</label><input type='password' name='new1' required minlength='10'>
+  <label>New password again</label><input type='password' name='new2' required minlength='10'>
+  <button>CHANGE PASSWORD</button>
+</form>
+<p style='font-size:12.5px;color:var(--faint);margin-top:16px;'>At least 10
+characters. After changing, your browser will ask you to log in again.</p>
+</div></body>""")
+
+
+@app.post("/admin/password")
+def password_change(user: str = Depends(_admin), current: str = Form(...),
+                    new1: str = Form(...), new2: str = Form(...)):
+    row = users.get(user)
+    if not row or not users.verify(current, row["pw_hash"]):
+        return _page("Current password is wrong - nothing changed.")
+    if new1 != new2:
+        return _page("The two new passwords don't match - nothing changed.")
+    if len(new1) < 10:
+        return _page("New password must be at least 10 characters - nothing changed.")
+    users.set_password(user, new1)
+    return _page("Password changed. Your browser will ask for the new login "
+                 "next time you open the portal.")
+
+
+@app.get("/admin/forgot")
+def forgot_form():
+    return HTMLResponse(f"""<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Reset password</title>{_FORM_CSS}
+<body><div class='card'><h2>Forgot password</h2>
+<form method='post' action='/admin/forgot'>
+  <label>Username</label><input name='username' required>
+  <button>EMAIL ME A RESET LINK</button>
+</form></div></body>""")
+
+
+@app.post("/admin/forgot")
+def forgot_submit(username: str = Form(...)):
+    row = users.get(username)
+    if row:
+        token = db.new_token()
+        with db.connect() as con:
+            con.execute("DELETE FROM reset_tokens WHERE expires < datetime('now')")
+            con.execute("INSERT INTO reset_tokens (token, username, expires) "
+                        "VALUES (?,?,datetime('now','+1 hour'))",
+                        (token, row["username"]))
+        link = f"{config.APP_BASE_URL}/admin/reset/{token}"
+        try:
+            send.send_email(row["email"], "Reset your Dolce portal password",
+                f"<div style='font-family:Arial;padding:20px;'>"
+                f"<p>A password reset was requested for the Dolce campaigns portal "
+                f"account <b>{row['username']}</b>.</p>"
+                f"<p><a href='{link}' style='background:#c2a273;color:#fff;"
+                f"padding:12px 24px;text-decoration:none;border-radius:6px;'>"
+                f"SET A NEW PASSWORD</a></p>"
+                f"<p style='color:#888;font-size:12px;'>The link works once and "
+                f"expires in 1 hour. If you didn't request this, ignore it - "
+                f"nothing changes.</p></div>")
+        except Exception:
+            pass
+    return _page("If that account exists, a reset link is on its way to its "
+                 "email address. The link expires in 1 hour.")
+
+
+@app.get("/admin/reset/{token}")
+def reset_form(token: str):
+    with db.connect() as con:
+        row = con.execute("SELECT username FROM reset_tokens WHERE token=? "
+                          "AND expires > datetime('now')", (token,)).fetchone()
+    if not row:
+        return _page("This reset link is invalid or has expired. Request a new "
+                     "one from the portal's Forgot password page.")
+    return HTMLResponse(f"""<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>New password</title>{_FORM_CSS}
+<body><div class='card'><h2>Set a new password</h2>
+<form method='post' action='/admin/reset/{token}'>
+  <label>New password</label><input type='password' name='new1' required minlength='10'>
+  <label>New password again</label><input type='password' name='new2' required minlength='10'>
+  <button>SET PASSWORD</button>
+</form></div></body>""")
+
+
+@app.post("/admin/reset/{token}")
+def reset_submit(token: str, new1: str = Form(...), new2: str = Form(...)):
+    with db.connect() as con:
+        row = con.execute("SELECT username FROM reset_tokens WHERE token=? "
+                          "AND expires > datetime('now')", (token,)).fetchone()
+        if not row:
+            return _page("This reset link is invalid or has expired.")
+        if new1 != new2 or len(new1) < 10:
+            return _page("Passwords must match and be at least 10 characters - "
+                         "go back and try again.")
+        con.execute("DELETE FROM reset_tokens WHERE token=?", (token,))
+    users.set_password(row["username"], new1)
+    return _page("Password set. Open the portal and log in with it.")
 
 
 @app.get("/admin/logout")
