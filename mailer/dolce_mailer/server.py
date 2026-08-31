@@ -797,11 +797,13 @@ def admin_view(cid: int, user: str = Depends(_admin)):
     st = r["status"]
     with db.connect() as con:
         recipients = con.execute(
-            """SELECT s.sent_at, c.first_name, c.email FROM sends s
+            """SELECT s.wix_id, s.sent_at, c.first_name, c.email FROM sends s
                LEFT JOIN contacts c ON c.wix_id = s.wix_id
                WHERE s.kind = ? ORDER BY s.sent_at""",
             (f"campaign:{cid}",)).fetchall()
-        planned = len(db.eligible_contacts(con, aud)) if st in ("pending", "approved") else None
+        planned_rows = (db.eligible_contacts(con, aud)
+                        if st in ("pending", "approved") else [])
+        planned = len(planned_rows) if st in ("pending", "approved") else None
     n_sent = len(recipients)
     if recipients:
         rec_rows = "".join(
@@ -827,6 +829,21 @@ def admin_view(cid: int, user: str = Depends(_admin)):
                      f"Audience: {planned} consented client(s)"
                      + (f" &middot; {n_sent} already sent, {remaining} remaining"
                         if n_sent else "") + "</p>")
+        if planned_rows:
+            sent_ids = {rc["wix_id"] for rc in recipients}
+            pl_rows = "".join(
+                f"<div style='display:flex;justify-content:space-between;gap:10px;"
+                f"padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;'>"
+                f"<span>{html_mod.escape(pc['first_name'] or '')}</span>"
+                f"<span style='color:var(--faint)'>{html_mod.escape(pc['email'] or '')}</span>"
+                + ("<span style='color:#5aa860;white-space:nowrap'>already received"
+                   "</span>" if pc["wix_id"] in sent_ids else "<span></span>")
+                + "</div>"
+                for pc in planned_rows)
+            plan_line += (f"<details style='margin-top:10px;'><summary style="
+                          f"'cursor:pointer;color:var(--gold);font-size:14px;'>"
+                          f"See who it will go to</summary>"
+                          f"<div style='margin-top:10px;'>{pl_rows}</div></details>")
     else:
         plan_line = ""
     btn = ("display:inline-block;padding:10px 22px;border-radius:8px;"
