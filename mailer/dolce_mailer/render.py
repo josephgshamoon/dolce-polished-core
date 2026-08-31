@@ -41,5 +41,5 @@ def render(html: str, contact) -> str:
                 .replace("{{unsubscribe_url}}", unsub)
                 .replace("{{logo_url}}", f"{base}/static/dolce-logo.png?v=2")
                 .replace("{{logo_url_polished}}", f"{base}/static/polished-logo.png")
-                .replace("{{logo_url_core_dark}}", f"{base}/static/core-logo-dark.png")
+                .replace("{{logo_url_core_dark}}", f"{base}/static/core-logo-dark.png?v=2")
                 .replace("{{logo_url_core}}", f"{base}/static/core-logo.png"))
