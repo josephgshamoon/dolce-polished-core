@@ -166,6 +166,8 @@ ADMIN_PAGE = """
   h1{font-family:Georgia,serif;font-weight:normal;font-size:26px;color:var(--ink);
      margin:26px 0 6px;}
   .sub{color:var(--muted);font-size:14px;margin:0;}
+  .corechip{display:inline-block;background:#111;border-radius:10px;padding:20px 28px;}
+  @media (prefers-color-scheme: dark){ .corechip{background:transparent;padding:0;} }
   .tabs{display:flex;gap:6px;justify-content:center;padding:16px 20px 0;
         flex-wrap:wrap;background:var(--card);}
   .tab{padding:8px 18px;border-radius:999px;font-size:13px;text-decoration:none;
@@ -406,8 +408,7 @@ def _render_admin(action="/admin/create", title="New campaign",
                      'alt="Polished by Dolce Salon" style="width:180px;max-width:60%;"></a>')
     elif brand == "core":
         logo_html = ('<a href="/admin?brand=core" style="text-decoration:none;">'
-                     '<span style="display:inline-block;background:#111;border-radius:10px;'
-                     'padding:20px 28px;"><img src="/static/core-logo.png" '
+                     '<span class="corechip"><img src="/static/core-logo.png" '
                      'alt="Core Yoga and Pilates Studio" '
                      'style="width:190px;max-width:100%;display:block;"></span></a>')
     else:
