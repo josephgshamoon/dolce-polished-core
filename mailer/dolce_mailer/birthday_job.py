@@ -6,22 +6,15 @@ welcome) and birthday data on the contact - flag: the Phoenix import needs a
 birthday column for this to be useful.
 """
 from datetime import date
-from pathlib import Path
 
 from . import alerts, config, db, preflight, render, send
-
-TEMPLATE = Path(__file__).parent / "templates" / "birthday.html"
-SUBJECT = "Happy birthday from Dolce"
 
 
 def run():
     preflight.check()
-    if not TEMPLATE.exists():
-        print("birthday_job: no birthday template yet, skipping")
-        return
     today = date.today()
     kind = f"birthday:{today.year}"
-    html_template = TEMPLATE.read_text()
+    subject_t, html_template = render.render_auto("birthday")
     sent = 0
     with db.connect() as con:
         for c in db.eligible_contacts(con):
@@ -32,7 +25,8 @@ def run():
                            (c["wix_id"], kind)).fetchone():
                 continue
             unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
-            send.send_email(c["email"], SUBJECT, render.render(html_template, c), unsub)
+            send.send_email(c["email"], render.render(subject_t, c),
+                            render.render(html_template, c), unsub)
             con.execute("INSERT INTO sends (wix_id, kind) VALUES (?,?)",
                         (c["wix_id"], kind))
             sent += 1

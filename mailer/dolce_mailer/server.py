@@ -209,6 +209,7 @@ ADMIN_PAGE = """
   <div class="card">
     <div style="display:flex;justify-content:flex-end;gap:14px;padding:12px 16px 0;">
       <a href="/admin" style="font-size:12px;color:var(--muted);text-decoration:none;">&#8635; Refresh</a>
+      <a href="/admin/auto" style="font-size:12px;color:var(--gold);text-decoration:none;">Automatic emails</a>
       <a href="/admin/password" style="font-size:12px;color:var(--muted);text-decoration:none;">Password</a>
       <a href="/admin/logout" style="font-size:12px;color:var(--muted);text-decoration:none;">Log out</a>
     </div>
@@ -417,6 +418,104 @@ _FORM_CSS = """
   button{width:100%;margin-top:24px;background:var(--gold);color:#fff;border:0;
         border-radius:8px;padding:14px;font-size:14px;letter-spacing:1px;cursor:pointer;}
 </style>"""
+
+
+AUTO_LABELS = {"welcome:dolce": "Welcome email - Dolce",
+               "welcome:polished": "Welcome email - Polished",
+               "welcome:core": "Welcome email - Core",
+               "birthday": "Birthday email (sent automatically on each client's birthday)"}
+
+
+@app.get("/admin/auto")
+def auto_list(user: str = Depends(_admin)):
+    with db.connect() as con:
+        rows = {r["key"]: r for r in con.execute("SELECT * FROM auto_templates")}
+    items = "".join(
+        f"<div class='row'><span><a href='/admin/auto/{k.replace(':', '-')}' "
+        f"style='color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);'>"
+        f"{label}</a></span>"
+        f"<span class='when'>updated {(rows[k]['updated_at'] or '')[:16] if k in rows else '-'}</span></div>"
+        for k, label in AUTO_LABELS.items())
+    page = f"""<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Automatic emails</title>
+<link rel='icon' type='image/png' href='/static/dolce-logo.png'>{_FORM_CSS}
+<body><div class='card' style='max-width:640px;'>
+<p><a href='/admin' style='color:var(--gold);text-decoration:none;font-size:13px;'>&larr; Back to campaigns</a></p>
+<h2>Automatic emails</h2>
+<p style='font-size:13.5px;color:var(--faint);'>These send themselves - welcomes when
+a client is added with a brand label, the birthday email on each client's birthday.
+Edits apply to everyone who receives them <b>from now on</b>; people who already
+got one are never re-sent.</p>
+<style>.row{{display:flex;justify-content:space-between;gap:10px;padding:12px 0;
+border-bottom:1px solid var(--line);font-size:14.5px;}}
+.when{{color:var(--faint);font-size:12px;white-space:nowrap;}}</style>
+{items}
+</div></body>"""
+    return HTMLResponse(page)
+
+
+def _auto_key(slug: str) -> str | None:
+    key = slug.replace("-", ":", 1) if slug.startswith("welcome-") else slug
+    return key if key in AUTO_LABELS else None
+
+
+@app.get("/admin/auto/{slug}")
+def auto_edit_form(slug: str, user: str = Depends(_admin)):
+    key = _auto_key(slug)
+    if not key:
+        return _page("Unknown automatic email.")
+    with db.connect() as con:
+        r = con.execute("SELECT * FROM auto_templates WHERE key=?", (key,)).fetchone()
+    if not r:
+        return _page("Template not initialised - run the database setup once.")
+    page = f"""<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>{AUTO_LABELS[key]}</title>
+<link rel='icon' type='image/png' href='/static/dolce-logo.png'>{_FORM_CSS}
+<body><div class='card' style='max-width:640px;'>
+<p><a href='/admin/auto' style='color:var(--gold);text-decoration:none;font-size:13px;'>&larr; All automatic emails</a></p>
+<h2>{AUTO_LABELS[key]}</h2>
+<form method='post' action='/admin/auto/{slug}'>
+  <label>Subject</label>
+  <input name='subject' required value="{html_mod.escape(r['subject'], quote=True)}">
+  <label>Heading</label>
+  <input name='heading' required value="{html_mod.escape(r['heading'], quote=True)}">
+  <label>Message <span style='color:var(--faint);text-transform:none;letter-spacing:0;'>(blank line = new paragraph; {{{{first_name}}}} becomes the client's name)</span></label>
+  <textarea name='body' rows='11' required
+    style='width:100%;box-sizing:border-box;border:1px solid var(--fb);border-radius:8px;
+    padding:12px;font-size:15px;background:var(--field);color:var(--ink);font-family:inherit;'
+    >{html_mod.escape(r['body_raw'])}</textarea>
+  <button>SAVE - GOES LIVE FOR FUTURE SENDS</button>
+</form>
+<p style='font-size:12.5px;color:var(--faint);margin-top:14px;'>On save, a test copy
+lands in {config.APPROVER_EMAIL} so you can see exactly what future clients will
+receive. Clients who already received this email are never re-sent.</p>
+</div></body>"""
+    return HTMLResponse(page)
+
+
+@app.post("/admin/auto/{slug}")
+def auto_edit_save(slug: str, user: str = Depends(_admin), subject: str = Form(...),
+                   heading: str = Form(...), body: str = Form(...)):
+    key = _auto_key(slug)
+    if not key:
+        return _page("Unknown automatic email.")
+    with db.connect() as con:
+        con.execute("UPDATE auto_templates SET subject=?, heading=?, body_raw=?, "
+                    "updated_at=CURRENT_TIMESTAMP WHERE key=?",
+                    (subject, heading, body, key))
+    sample = {"first_name": "Maya", "unsub_token": "preview"}
+    subj_t, html_t = render.render_auto(key)
+    try:
+        send.send_email(config.APPROVER_EMAIL,
+                        f"[TEST - automatic email] {render.render(subj_t, sample)}",
+                        render.render(html_t, sample))
+    except Exception:
+        pass
+    return _page(f"<b>{AUTO_LABELS[key]}</b> updated - live for all future sends. "
+                 f"A test copy is on its way to {config.APPROVER_EMAIL}. "
+                 "Nobody who already received it will get it again.")
 
 
 @app.get("/admin/password")

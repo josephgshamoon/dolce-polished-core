@@ -3,14 +3,10 @@ per brand. A client who later joins a second brand receives that brand's
 welcome at that point. Once-only is enforced per contact id AND per email
 address within each brand. Batches are throttled to MAX_SENDS_PER_RUN."""
 import time
-from pathlib import Path
 
 from . import alerts, config, db, preflight, render, send, wix_sync
 
-TPL_DIR = Path(__file__).parent / "templates"
 BRANDS = ("dolce", "polished", "core")
-SUBJECTS = {"dolce": "Welcome to Dolce", "polished": "Welcome to Polished",
-            "core": "Welcome to Core"}
 
 
 def run():
@@ -19,11 +15,10 @@ def run():
     sent, failures, capped = 0, [], False
     with db.connect() as con:
         for brand in BRANDS:
-            tpl = TPL_DIR / f"welcome-{brand}.html"
-            if capped or not tpl.exists():
+            if capped:
                 continue
-            html_template = tpl.read_text()
             kind = f"welcome:{brand}"
+            subject_t, html_template = render.render_auto(kind)
             for c in db.eligible_contacts(con, brand):
                 done = con.execute(
                     """SELECT 1 FROM sends s JOIN contacts c2 ON s.wix_id = c2.wix_id
@@ -39,7 +34,7 @@ def run():
                 html = render.render(html_template, c)
                 unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
                 try:
-                    send.send_email(c["email"], SUBJECTS[brand], html, unsub)
+                    send.send_email(c["email"], render.render(subject_t, c), html, unsub)
                 except Exception as e:
                     failures.append(f"{brand} / {c['email']}: {e}")
                     continue

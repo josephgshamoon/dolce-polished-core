@@ -37,6 +37,13 @@ CREATE TABLE IF NOT EXISTS campaigns (
     decided_at  TEXT,
     sent_at     TEXT
 );
+CREATE TABLE IF NOT EXISTS auto_templates (
+    key         TEXT PRIMARY KEY,        -- welcome:dolce|welcome:polished|welcome:core|birthday
+    subject     TEXT NOT NULL,
+    heading     TEXT NOT NULL,
+    body_raw    TEXT NOT NULL,           -- plain text, blank line = paragraph
+    updated_at  TEXT DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS users (
     username    TEXT PRIMARY KEY,
     email       TEXT NOT NULL,
@@ -74,6 +81,7 @@ def init():
         if "scheduled_at" not in cols:
             con.execute("ALTER TABLE campaigns ADD COLUMN scheduled_at TEXT")
         con.execute("UPDATE sends SET kind='welcome:dolce' WHERE kind='welcome'")
+        _seed_auto_templates(con)
         # bootstrap: seed the first portal user from the legacy env credential
         if not con.execute("SELECT 1 FROM users LIMIT 1").fetchone():
             if config.ADMIN_PASSWORD:
@@ -112,3 +120,46 @@ def eligible_contacts(con, audience="all"):
 if __name__ == "__main__":
     init()
     print("database initialised")
+
+
+AUTO_SEEDS = {
+    "welcome:dolce": ("Welcome to Dolce", "Welcome to Dolce",
+        "Welcome to Dolce. We're so happy to have you with us.\n\n"
+        "We'll be sharing what's new at Dolce Aesthetic Clinic - from new treatments "
+        "and services to clinic updates, special events, and exclusive offers created "
+        "for our clients.\n\n"
+        "Whether you're looking to refresh your skin, explore a new treatment, or "
+        "simply have a question, our team is always here to help.\n\n"
+        "Ready to book or have a question?\n"
+        "Message us on WhatsApp and our team will be happy to assist you."),
+    "welcome:polished": ("Welcome to Polished", "Welcome to Polished",
+        "Welcome to Polished. We're so happy to have you with us.\n\n"
+        "We'll be sharing what's new at Polished by Dolce Salon - from hair, nails "
+        "and beauty services to salon updates, special events, and exclusive offers "
+        "created for our clients.\n\n"
+        "Whether you're booking your next appointment or simply have a question, "
+        "our team is always here to help.\n\n"
+        "Ready to book or have a question?\n"
+        "Message us on WhatsApp and our team will be happy to assist you."),
+    "welcome:core": ("Welcome to Core", "Welcome to Core",
+        "Welcome to Core. We're so happy to have you with us.\n\n"
+        "We'll be sharing what's new at Core Yoga & Pilates Studio - from classes "
+        "and schedules to studio updates, special events, and exclusive offers "
+        "created for our members.\n\n"
+        "Whether you're booking your next class or simply have a question, our team "
+        "is always here to help.\n\n"
+        "Ready to book or have a question?\n"
+        "Message us on WhatsApp and our team will be happy to assist you."),
+    "birthday": ("Happy birthday from Dolce", "Happy birthday, {{first_name}}!",
+        "All of us at Dolce wish you a wonderful birthday and a beautiful year "
+        "ahead.\n\n"
+        "Thank you for being part of the Dolce family - we look forward to seeing "
+        "you at the clinic soon."),
+}
+
+
+def _seed_auto_templates(con):
+    for key, (subject, heading, body) in AUTO_SEEDS.items():
+        con.execute("INSERT OR IGNORE INTO auto_templates "
+                    "(key, subject, heading, body_raw) VALUES (?,?,?,?)",
+                    (key, subject, heading, body))
