@@ -392,8 +392,9 @@ def _render_admin(action="/admin/create", title="New campaign",
                       + bd + '</div>')
     else:
         bd_section = ""
-    logo_html = ('<img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic" '
-                 'style="width:190px;max-width:70%;">' if brand == "dolce" else "")
+    logo_html = ('<a href="/admin"><img src="/static/dolce-logo.png" '
+                 'alt="Dolce Aesthetic Clinic" '
+                 'style="width:190px;max-width:70%;"></a>' if brand == "dolce" else "")
     if show_archived:
         recent_title = "Archived campaigns"
         arch_toggle = (f"<a href='/admin?brand={brand}' style='font-size:12px;"
@@ -954,6 +955,10 @@ def admin_preview(user: str = Depends(_admin), name: str = Form(...),
 </style>
 <body>
   <div style="max-width:700px;margin:30px auto;padding:0 14px;">
+    <p style="margin:0 0 12px;"><a href="/admin" style="color:var(--gold);
+       text-decoration:none;font-size:13px;">&larr; Home - campaigns</a>
+       <span style="font-size:12px;color:var(--faint);">(leaving discards this
+       unsaved draft - use Keep editing to go back with your text)</span></p>
     <div style="background:var(--card);border-radius:12px;padding:22px 26px;">
       <h1 style="font-family:Georgia,serif;font-weight:normal;font-size:21px;
           color:var(--ink);margin:0 0 4px;">Preview - nothing is created yet</h1>
