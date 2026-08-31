@@ -489,6 +489,56 @@ def _auto_key(slug: str) -> str | None:
     return key if key in AUTO_LABELS else None
 
 
+def _auto_render_custom(key: str, heading: str, body: str) -> str:
+    shell = (render.TPL_DIR / render.AUTO_FILES[key]).read_text()
+    html = (shell.replace("{{heading}}", html_mod.escape(heading))
+                 .replace("{{body}}", render.paragraphs_to_html(body)))
+    rendered = render.render(html, {"first_name": "Maya", "unsub_token": "preview"})
+    m = re.search(r"<body[^>]*>(.*)</body>", rendered, re.S)
+    return m.group(1) if m else rendered
+
+
+def _auto_form_page(key: str, slug: str, subject: str, heading: str, body: str,
+                    note: str = "") -> HTMLResponse:
+    preview_inner = _auto_render_custom(key, heading, body)
+    page = f"""<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>{AUTO_LABELS[key]}</title>
+<link rel='icon' type='image/png' href='/static/dolce-logo.png'>{_FORM_CSS}
+<body><div class='card' style='max-width:680px;'>
+<p><a href='/admin/auto' style='color:var(--gold);text-decoration:none;font-size:13px;'>&larr; All automatic emails</a></p>
+<h2>{AUTO_LABELS[key]}</h2>{note}
+<form method='post' action='/admin/auto/{slug}'>
+  <label>Subject</label>
+  <input name='subject' required value="{html_mod.escape(subject, quote=True)}">
+  <label>Heading</label>
+  <input name='heading' required value="{html_mod.escape(heading, quote=True)}">
+  <label>Message <span style='color:var(--faint);text-transform:none;letter-spacing:0;'>(blank line = new paragraph; {{{{first_name}}}} becomes the client's name)</span></label>
+  <textarea name='body' rows='11' required
+    style='width:100%;box-sizing:border-box;border:1px solid var(--fb);border-radius:8px;
+    padding:12px;font-size:15px;background:var(--field);color:var(--ink);font-family:inherit;'
+    >{html_mod.escape(body)}</textarea>
+  <div style='display:flex;gap:12px;'>
+    <button type='submit' formaction='/admin/auto/{slug}/preview'
+      style='background:transparent;border:1px solid var(--gold);color:var(--gold);'>
+      PREVIEW CHANGES</button>
+    <button type='submit'>SAVE - GOES LIVE FOR FUTURE SENDS</button>
+  </div>
+</form>
+<p style='font-size:12.5px;color:var(--faint);margin-top:14px;'>On save, a test copy
+lands in {config.APPROVER_EMAIL}. Clients who already received this email are never
+re-sent.</p>
+</div>
+<div style='max-width:680px;margin:8px auto 40px;padding:0 14px;'>
+  <p style='font-family:Georgia,serif;color:var(--ink);font-size:16px;margin:18px 0 8px;'>
+    How it looks with the text above:</p>
+  <div style='border:1px solid var(--line);border-radius:10px;overflow:hidden;
+       background:#f5eff0;'>{preview_inner}</div>
+</div>
+</body>"""
+    return HTMLResponse(page)
+
+
 @app.get("/admin/auto/{slug}")
 def auto_edit_form(slug: str, user: str = Depends(_admin)):
     key = _auto_key(slug)
@@ -498,30 +548,20 @@ def auto_edit_form(slug: str, user: str = Depends(_admin)):
         r = con.execute("SELECT * FROM auto_templates WHERE key=?", (key,)).fetchone()
     if not r:
         return _page("Template not initialised - run the database setup once.")
-    page = f"""<!doctype html><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>{AUTO_LABELS[key]}</title>
-<link rel='icon' type='image/png' href='/static/dolce-logo.png'>{_FORM_CSS}
-<body><div class='card' style='max-width:640px;'>
-<p><a href='/admin/auto' style='color:var(--gold);text-decoration:none;font-size:13px;'>&larr; All automatic emails</a></p>
-<h2>{AUTO_LABELS[key]}</h2>
-<form method='post' action='/admin/auto/{slug}'>
-  <label>Subject</label>
-  <input name='subject' required value="{html_mod.escape(r['subject'], quote=True)}">
-  <label>Heading</label>
-  <input name='heading' required value="{html_mod.escape(r['heading'], quote=True)}">
-  <label>Message <span style='color:var(--faint);text-transform:none;letter-spacing:0;'>(blank line = new paragraph; {{{{first_name}}}} becomes the client's name)</span></label>
-  <textarea name='body' rows='11' required
-    style='width:100%;box-sizing:border-box;border:1px solid var(--fb);border-radius:8px;
-    padding:12px;font-size:15px;background:var(--field);color:var(--ink);font-family:inherit;'
-    >{html_mod.escape(r['body_raw'])}</textarea>
-  <button>SAVE - GOES LIVE FOR FUTURE SENDS</button>
-</form>
-<p style='font-size:12.5px;color:var(--faint);margin-top:14px;'>On save, a test copy
-lands in {config.APPROVER_EMAIL} so you can see exactly what future clients will
-receive. Clients who already received this email are never re-sent.</p>
-</div></body>"""
-    return HTMLResponse(page)
+    return _auto_form_page(key, slug, r["subject"], r["heading"], r["body_raw"])
+
+
+@app.post("/admin/auto/{slug}/preview")
+def auto_preview(slug: str, user: str = Depends(_admin), subject: str = Form(...),
+                 heading: str = Form(...), body: str = Form(...)):
+    key = _auto_key(slug)
+    if not key:
+        return _page("Unknown automatic email.")
+    note = ("<p style='background:var(--field);border:1px solid var(--fb);"
+            "border-radius:8px;padding:10px 14px;font-size:13px;color:var(--body);'>"
+            "This is a preview of your <b>unsaved</b> changes, shown below the form. "
+            "Press SAVE to make them live, or keep editing.</p>")
+    return _auto_form_page(key, slug, subject, heading, body, note)
 
 
 @app.post("/admin/auto/{slug}")
