@@ -12,7 +12,8 @@ def check():
         raise SystemExit(
             f"PREFLIGHT FAILED: APP_BASE_URL is '{base}' - still a placeholder "
             "or not https. Fix .env before sending.")
-    for name in ("dolce-logo.png", "polished-logo.png", "core-logo.png"):
+    for name in ("dolce-logo.png", "polished-logo.png", "core-logo.png",
+                 "core-logo-dark.png"):
         url = f"{base}/static/{name}"
         try:
             r = httpx.get(url, timeout=15, follow_redirects=True)
