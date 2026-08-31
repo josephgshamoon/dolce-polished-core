@@ -498,7 +498,7 @@ _FORM_CSS = """
 AUTO_LABELS = {"welcome:dolce": "Welcome email - Dolce",
                "welcome:polished": "Welcome email - Polished",
                "welcome:core": "Welcome email - Core",
-               "review:dolce": "Review request - Dolce (14 days after the welcome)",
+               "review:dolce": "Review request - Dolce (3 days after the welcome)",
                "birthday:dolce": "Birthday email - Dolce",
                "birthday:polished": "Birthday email - Polished",
                "birthday:core": "Birthday email - Core"}

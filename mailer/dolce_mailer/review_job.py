@@ -1,7 +1,7 @@
 """Automatic review request - Dolce only for now.
 
-Sends each consented Dolce client ONE review-request email, 14 days after
-their Dolce welcome was sent (by then they have almost certainly visited).
+Sends each consented Dolce client ONE review-request email, 3 days after
+their Dolce welcome was sent.
 Once-only is enforced per contact id AND per email address, like welcomes.
 Runs piggybacked on the welcome job's cron entry - no extra crontab line.
 Brands are added here only once their Google Business Profile is claimed
@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from . import alerts, config, db, preflight, render, send
 
-DAYS_AFTER_WELCOME = 14
+DAYS_AFTER_WELCOME = 3
 
 
 def run():
