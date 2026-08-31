@@ -652,7 +652,7 @@ def admin_preview(user: str = Depends(_admin), name: str = Form(...),
     preview_html = render.render(_campaign_html(heading, body), sample)
     m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
     inner = m.group(1) if m else preview_html
-    subject = render.render(subject, sample) if "{{" in subject else subject
+    subject_display = render.render(subject, sample) if "{{" in subject else subject
     confirm_label = ("LOOKS GOOD - CREATE" if return_action == "/admin/create"
                      else "LOOKS GOOD - SAVE")
     hidden = _hidden_fields(name, subject, heading, body, audience, return_action,
@@ -678,7 +678,7 @@ def admin_preview(user: str = Depends(_admin), name: str = Form(...),
       <h1 style="font-family:Georgia,serif;font-weight:normal;font-size:21px;
           color:var(--ink);margin:0 0 4px;">Preview - nothing is created yet</h1>
       <p style="font-size:13.5px;color:var(--faint);margin:0 0 16px;">
-        Subject: {html_mod.escape(subject)}</p>
+        Subject: {html_mod.escape(subject_display)}</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <form method="post" action="/admin/compose" style="margin:0;">{hidden}
           <button style="{btn}background:transparent;border:1px solid var(--gold);
