@@ -398,9 +398,20 @@ def _render_admin(action="/admin/create", title="New campaign",
                       + bd + '</div>')
     else:
         bd_section = ""
-    logo_html = ('<a href="/admin"><img src="/static/dolce-logo.png" '
-                 'alt="Dolce Aesthetic Clinic" '
-                 'style="width:190px;max-width:70%;"></a>' if brand == "dolce" else "")
+    if brand == "dolce":
+        logo_html = ('<a href="/admin"><img src="/static/dolce-logo.png" '
+                     'alt="Dolce Aesthetic Clinic" style="width:190px;max-width:70%;"></a>')
+    elif brand == "polished":
+        logo_html = ('<a href="/admin?brand=polished"><img src="/static/polished-logo.png" '
+                     'alt="Polished by Dolce Salon" style="width:180px;max-width:60%;"></a>')
+    elif brand == "core":
+        logo_html = ('<a href="/admin?brand=core" style="text-decoration:none;">'
+                     '<span style="display:inline-block;background:#111;border-radius:10px;'
+                     'padding:20px 28px;"><img src="/static/core-logo.png" '
+                     'alt="Core Yoga and Pilates Studio" '
+                     'style="width:190px;max-width:100%;display:block;"></span></a>')
+    else:
+        logo_html = ""
     if show_archived:
         recent_title = "Archived campaigns"
         arch_toggle = (f"<a href='/admin?brand={brand}' style='font-size:12px;"

@@ -36,7 +36,9 @@ def render_auto(key: str):
 def render(html: str, contact) -> str:
     first = (contact["first_name"] or "").strip() or "there"
     unsub = f"{config.APP_BASE_URL}/unsubscribe/{contact['unsub_token']}"
-    logo = f"{config.APP_BASE_URL}/static/dolce-logo.png?v=2"
+    base = config.APP_BASE_URL
     return (html.replace("{{first_name}}", first)
                 .replace("{{unsubscribe_url}}", unsub)
-                .replace("{{logo_url}}", logo))
+                .replace("{{logo_url}}", f"{base}/static/dolce-logo.png?v=2")
+                .replace("{{logo_url_polished}}", f"{base}/static/polished-logo.png")
+                .replace("{{logo_url_core}}", f"{base}/static/core-logo.png"))

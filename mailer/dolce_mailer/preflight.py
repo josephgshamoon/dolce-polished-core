@@ -12,16 +12,17 @@ def check():
         raise SystemExit(
             f"PREFLIGHT FAILED: APP_BASE_URL is '{base}' - still a placeholder "
             "or not https. Fix .env before sending.")
-    url = f"{base}/static/dolce-logo.png"
-    try:
-        r = httpx.get(url, timeout=15, follow_redirects=True)
-    except Exception as e:
-        raise SystemExit(
-            f"PREFLIGHT FAILED: cannot fetch {url} ({e}). The web service or "
-            "nginx is down - emails would carry broken images. Fix, then rerun.")
-    ct = r.headers.get("content-type", "")
-    if r.status_code != 200 or not ct.startswith("image/"):
-        raise SystemExit(
-            f"PREFLIGHT FAILED: {url} returned {r.status_code} ({ct or 'no type'}). "
-            "Emails would carry broken images. Fix, then rerun.")
-    print(f"preflight ok: {url} serves {ct}")
+    for name in ("dolce-logo.png", "polished-logo.png", "core-logo.png"):
+        url = f"{base}/static/{name}"
+        try:
+            r = httpx.get(url, timeout=15, follow_redirects=True)
+        except Exception as e:
+            raise SystemExit(
+                f"PREFLIGHT FAILED: cannot fetch {url} ({e}). The web service or "
+                "nginx is down - emails would carry broken images. Fix, then rerun.")
+        ct = r.headers.get("content-type", "")
+        if r.status_code != 200 or not ct.startswith("image/"):
+            raise SystemExit(
+                f"PREFLIGHT FAILED: {url} returned {r.status_code} ({ct or 'no type'}). "
+                "Emails would carry broken images. Fix, then rerun.")
+    print("preflight ok: all brand logos serving")
