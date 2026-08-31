@@ -8,7 +8,9 @@ TPL_DIR = Path(__file__).parent / "templates"
 AUTO_FILES = {"welcome:dolce": "welcome-dolce.html",
               "welcome:polished": "welcome-polished.html",
               "welcome:core": "welcome-core.html",
-              "birthday": "birthday.html"}
+              "birthday:dolce": "birthday.html",
+              "birthday:polished": "birthday-polished.html",
+              "birthday:core": "birthday-core.html"}
 
 
 def paragraphs_to_html(body: str) -> str:

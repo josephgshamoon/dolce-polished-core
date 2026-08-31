@@ -148,15 +148,34 @@ AUTO_SEEDS = {
         "is always here to help.\n\n"
         "Ready to book or have a question?\n"
         "Message us on WhatsApp and our team will be happy to assist you."),
-    "birthday": ("Happy birthday from Dolce", "Happy birthday, {{first_name}}!",
+    "birthday:dolce": ("Happy birthday from Dolce", "Happy birthday, {{first_name}}!",
         "All of us at Dolce wish you a wonderful birthday and a beautiful year "
         "ahead.\n\n"
         "Thank you for being part of the Dolce family - we look forward to seeing "
         "you at the clinic soon."),
+    "birthday:polished": ("Happy birthday from Polished", "Happy birthday, {{first_name}}!",
+        "All of us at Polished wish you a wonderful birthday and a beautiful year "
+        "ahead.\n\n"
+        "Thank you for being part of the Polished family - we look forward to "
+        "seeing you at the salon soon."),
+    "birthday:core": ("Happy birthday from Core", "Happy birthday, {{first_name}}!",
+        "All of us at Core wish you a wonderful birthday and a wonderful year "
+        "ahead.\n\n"
+        "Thank you for being part of the Core family - we look forward to seeing "
+        "you at the studio soon."),
 }
 
 
 def _seed_auto_templates(con):
+    # one-time migration: the old single 'birthday' copy becomes the Dolce one,
+    # keeping any edits made in the portal
+    old = con.execute("SELECT * FROM auto_templates WHERE key='birthday'").fetchone()
+    if old:
+        con.execute("INSERT OR IGNORE INTO auto_templates "
+                    "(key, subject, heading, body_raw) VALUES (?,?,?,?)",
+                    ("birthday:dolce", old["subject"], old["heading"],
+                     old["body_raw"]))
+        con.execute("DELETE FROM auto_templates WHERE key='birthday'")
     for key, (subject, heading, body) in AUTO_SEEDS.items():
         con.execute("INSERT OR IGNORE INTO auto_templates "
                     "(key, subject, heading, body_raw) VALUES (?,?,?,?)",

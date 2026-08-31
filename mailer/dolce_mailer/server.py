@@ -475,7 +475,9 @@ _FORM_CSS = """
 AUTO_LABELS = {"welcome:dolce": "Welcome email - Dolce",
                "welcome:polished": "Welcome email - Polished",
                "welcome:core": "Welcome email - Core",
-               "birthday": "Birthday email (sent automatically on each client's birthday)"}
+               "birthday:dolce": "Birthday email - Dolce",
+               "birthday:polished": "Birthday email - Polished",
+               "birthday:core": "Birthday email - Core"}
 
 
 @app.get("/admin/auto")
@@ -496,7 +498,8 @@ def auto_list(user: str = Depends(_admin)):
 <p><a href='/admin' style='color:var(--gold);text-decoration:none;font-size:13px;'>&larr; Back to campaigns</a></p>
 <h2>Automatic emails</h2>
 <p style='font-size:13.5px;color:var(--faint);'>These send themselves - welcomes when
-a client is added with a brand label, the birthday email on each client's birthday.
+a client is added with a brand label, birthday emails on each client's birthday,
+always in the client's own brand design.
 Edits apply to everyone who receives them <b>from now on</b>; people who already
 got one are never re-sent.</p>
 <style>.row{{display:flex;justify-content:space-between;gap:10px;padding:12px 0;
@@ -508,7 +511,8 @@ border-bottom:1px solid var(--line);font-size:14.5px;}}
 
 
 def _auto_key(slug: str) -> str | None:
-    key = slug.replace("-", ":", 1) if slug.startswith("welcome-") else slug
+    key = (slug.replace("-", ":", 1)
+           if slug.startswith(("welcome-", "birthday-")) else slug)
     return key if key in AUTO_LABELS else None
 
 

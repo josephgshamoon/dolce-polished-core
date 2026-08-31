@@ -14,7 +14,9 @@ def run():
     preflight.check()
     today = date.today()
     kind = f"birthday:{today.year}"
-    subject_t, html_template = render.render_auto("birthday")
+    # one brand-styled email per client; a client in several brands gets the
+    # first matching design (dolce > polished > core), never more than one
+    templates = {b: render.render_auto(f"birthday:{b}") for b in db.BRAND_KEYS}
     sent = 0
     with db.connect() as con:
         for c in db.eligible_contacts(con):
@@ -24,6 +26,9 @@ def run():
             if con.execute("SELECT 1 FROM sends WHERE wix_id=? AND kind=?",
                            (c["wix_id"], kind)).fetchone():
                 continue
+            brand = next(bk for bk in db.BRAND_KEYS
+                         if bk in (c["labels"] or ""))
+            subject_t, html_template = templates[brand]
             unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
             send.send_email(c["email"], render.render(subject_t, c),
                             render.render(html_template, c), unsub)
