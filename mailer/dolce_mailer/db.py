@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     heading     TEXT DEFAULT '',
     body_raw    TEXT DEFAULT '',
     audience    TEXT DEFAULT 'all',
+    scheduled_at TEXT,            -- UTC ISO; approved campaigns wait for this
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
     decided_at  TEXT,
     sent_at     TEXT
@@ -59,6 +60,8 @@ def init():
             con.execute("ALTER TABLE campaigns ADD COLUMN body_raw TEXT DEFAULT ''")
         if "audience" not in cols:
             con.execute("ALTER TABLE campaigns ADD COLUMN audience TEXT DEFAULT 'all'")
+        if "scheduled_at" not in cols:
+            con.execute("ALTER TABLE campaigns ADD COLUMN scheduled_at TEXT")
         con.execute("UPDATE sends SET kind='welcome:dolce' WHERE kind='welcome'")
 
 

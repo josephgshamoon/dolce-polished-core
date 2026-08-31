@@ -131,7 +131,7 @@ async def brevo_webhook(request: Request):
 
 CAMPAIGN_SHELL = Path(__file__).parent / "templates" / "campaign.html"
 
-STATUS_COLORS = {"pending": "#c9a227", "approved": "#5aa860",
+STATUS_COLORS = {"draft": "#8a8a8a", "pending": "#c9a227", "approved": "#5aa860",
                  "sent": "#a08d63", "rejected": "#c96060"}
 
 ADMIN_PAGE = """
@@ -232,14 +232,38 @@ ADMIN_PAGE = """
       <input name="heading" required placeholder="e.g. An autumn treat, just for you" value="%%V_HEADING%%">
       <div class="hint">The large title inside the email.</div>
       <label>Message</label>
+      <div style="margin:0 0 8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:12px;color:var(--faint);">Insert:</span>
+        <button type="button" onclick="insertPh('{{first_name}}')"
+          style="all:unset;cursor:pointer;font-size:12px;color:var(--gold);
+                 border:1px solid var(--gold);border-radius:999px;padding:4px 12px;">
+          + client's first name</button>
+        <span style="font-size:11.5px;color:var(--faint);">works in the subject,
+          heading and message - becomes each client's own name</span>
+      </div>
       <textarea name="body" rows="9" required
         placeholder="Write naturally, like a note to a client.&#10;&#10;Leave a blank line to start a new paragraph. Every email automatically starts with the client's name and ends with the WhatsApp button and your clinic details.">%%V_BODY%%</textarea>
+      <label>Send time <span style="color:#b5a7a9;text-transform:none;letter-spacing:0;">(optional)</span></label>
+      <input type="datetime-local" name="schedule_local" value="%%V_SCHED%%">
+      <div class="hint">Leave empty to send right after approval. Times are Erbil time -
+        after approval the campaign waits until this moment.</div>
       <div style="display:flex;gap:12px;margin-top:30px;">
         <button type="submit" formaction="/admin/preview"
           style="margin-top:0;background:transparent;border:1px solid var(--gold);
                  color:var(--gold);">PREVIEW FIRST</button>
+        <button type="submit" formaction="/admin/draft"
+          style="margin-top:0;background:transparent;border:1px solid var(--faint);
+                 color:var(--muted);">SAVE AS DRAFT</button>
         <button type="submit" style="margin-top:0;">%%BUTTON%%</button>
       </div>
+      <script>
+        function insertPh(t){
+          var el=document.querySelector("textarea[name=body]");
+          var a=el.selectionStart||0, b=el.selectionEnd||0;
+          el.value=el.value.slice(0,a)+t+el.value.slice(b);
+          el.focus(); el.selectionStart=el.selectionEnd=a+t.length;
+        }
+      </script>
     </form>
 %%BIRTHDAYS_SECTION%%
     <div class="recent">
@@ -285,7 +309,17 @@ def _render_admin(action="/admin/create", title="New campaign",
         for r in rows:
             fg = STATUS_COLORS.get(r["status"], "#8a8a8a")
             actions = ""
-            if r["status"] == "pending":
+            if r["status"] == "draft":
+                actions = (f"<a href='/admin/edit/{r['id']}' style='color:#c2a273;"
+                           f"font-size:12px;margin-right:8px;'>edit</a>"
+                           f"<form method='post' action='/admin/submit/{r['id']}' "
+                           f"style='display:inline;margin-right:8px;'><button style='all:unset;"
+                           f"color:#5aa860;font-size:12px;cursor:pointer;'>submit for approval"
+                           f"</button></form>"
+                           f"<form method='post' action='/admin/delete/{r['id']}' "
+                           f"style='display:inline'><button style='all:unset;color:#c96060;"
+                           f"font-size:12px;cursor:pointer;'>delete</button></form>")
+            elif r["status"] == "pending":
                 actions = (f"<a href='/admin/edit/{r['id']}' style='color:#c2a273;"
                            f"font-size:12px;margin-right:8px;'>edit</a>"
                            f"<form method='post' action='/admin/delete/{r['id']}' "
@@ -357,6 +391,7 @@ def _render_admin(action="/admin/create", title="New campaign",
                       .replace("%%V_NAME%%", html_mod.escape(v.get("name", ""), quote=True))
                       .replace("%%V_SUBJECT%%", html_mod.escape(v.get("subject", ""), quote=True))
                       .replace("%%V_HEADING%%", html_mod.escape(v.get("heading", ""), quote=True))
+                      .replace("%%V_SCHED%%", html_mod.escape(v.get("schedule_local", ""), quote=True))
                       .replace("%%V_BODY%%", html_mod.escape(v.get("body", ""))))
     return HTMLResponse(page)
 
@@ -382,14 +417,16 @@ def admin_form(user: str = Depends(_admin), brand: str = "dolce"):
 def admin_edit_form(cid: int, user: str = Depends(_admin)):
     with db.connect() as con:
         r = con.execute("SELECT * FROM campaigns WHERE id=?", (cid,)).fetchone()
-    if not r or r["status"] not in ("pending", "approved"):
+    if not r or r["status"] not in ("draft", "pending", "approved"):
         return _page("Sent campaigns can't be edited - open the campaign and use "
                      "Duplicate instead.")
     keys = r.keys()
     aud = (r["audience"] if "audience" in keys else "all") or "all"
     vals = {"name": r["name"], "subject": r["subject"],
             "heading": r["heading"] or "", "body": r["body_raw"] or "",
-            "audience": aud}
+            "audience": aud,
+            "schedule_local": _sched_to_local(
+                r["scheduled_at"] if "scheduled_at" in keys else None)}
     return _render_admin(action=f"/admin/edit/{cid}",
                          title=f"Edit campaign - {BRAND_TITLES.get(aud, aud)}",
                          button="SAVE &amp; RESEND FOR APPROVAL", values=vals,
@@ -400,13 +437,16 @@ def admin_edit_form(cid: int, user: str = Depends(_admin)):
 def admin_edit(cid: int, user: str = Depends(_admin), name: str = Form(...),
                subject: str = Form(...), heading: str = Form(...),
                body: str = Form(...), audience: str = Form("all"),
-               return_action: str = Form(None)):
+               return_action: str = Form(None), schedule_local: str = Form("")):
     try:
-        campaigns.update_campaign(cid, name, subject,
-                                  _campaign_html(heading, body), heading, body,
-                                  audience=audience)
+        stayed_draft = campaigns.update_campaign(
+            cid, name, subject, _campaign_html(heading, body), heading, body,
+            audience=audience, scheduled_at=_sched_to_utc(schedule_local))
     except ValueError as e:
         return _page(str(e))
+    if stayed_draft:
+        return _page(f"Draft <b>{html_mod.escape(name)}</b> updated. Still a draft - "
+                     "no emails sent. Submit it for approval when ready.")
     return _page(f"Campaign <b>{html_mod.escape(name)}</b> updated and paused for "
                  f"re-approval. A fresh test copy and approval email are on their way "
                  f"to {config.APPROVER_EMAIL}; the previous approval links no longer "
@@ -448,6 +488,11 @@ def admin_view(cid: int, user: str = Depends(_admin)):
                     f"see who</summary><div style='margin-top:10px;'>{rec_rows}</div></details>")
     else:
         delivery = ""
+    sched_line = ""
+    sl = _sched_to_local(r["scheduled_at"] if "scheduled_at" in keys else None)
+    if sl and st in ("draft", "pending", "approved"):
+        sched_line = (f"<p style='font-size:13.5px;color:var(--faint);margin:10px 0 0;'>"
+                      f"Scheduled send: {sl.replace('T', ' ')} (Erbil time)</p>")
     if planned is not None:
         remaining = planned - n_sent
         plan_line = (f"<p style='font-size:13.5px;color:var(--faint);margin:10px 0 0;'>"
@@ -459,9 +504,14 @@ def admin_view(cid: int, user: str = Depends(_admin)):
     btn = ("display:inline-block;padding:10px 22px;border-radius:8px;"
            "text-decoration:none;font-size:13px;letter-spacing:1px;")
     acts = []
-    if st in ("pending", "approved"):
+    if st in ("draft", "pending", "approved"):
         acts.append(f"<a href='/admin/edit/{cid}' style='{btn}background:#c2a273;"
                     f"color:#fff;'>EDIT</a>")
+    if st == "draft":
+        acts.append(f"<form method='post' action='/admin/submit/{cid}' "
+                    f"style='display:inline'><button style='{btn}background:#5aa860;"
+                    f"color:#fff;border:0;cursor:pointer;'>SUBMIT FOR APPROVAL"
+                    f"</button></form>")
     if st == "approved":
         acts.append(f"<form method='post' action='/admin/cancel/{cid}' "
                     f"style='display:inline'><button style='{btn}background:#c96060;"
@@ -500,7 +550,7 @@ def admin_view(cid: int, user: str = Depends(_admin)):
         letter-spacing:1px;border:1px solid currentColor;border-radius:999px;
         padding:3px 10px;">{st}</span> &nbsp;&middot;&nbsp; {r['created_at'][:16]}</p>
       <p style="margin:0 0 8px;">{''.join(acts)}</p>
-      {note}{plan_line}{delivery}
+      {note}{sched_line}{plan_line}{delivery}
     </div>
     <p style="font-family:Georgia,serif;color:var(--ink);font-size:16px;
        margin:24px 0 8px;">How it looks to clients:</p>
@@ -532,7 +582,7 @@ def admin_delete(cid: int, user: str = Depends(_admin)):
         r = con.execute("SELECT status, name FROM campaigns WHERE id=?", (cid,)).fetchone()
         if not r:
             return _page("Campaign not found.")
-        if r["status"] not in ("pending", "rejected"):
+        if r["status"] not in ("draft", "pending", "rejected"):
             return _page("Sent campaigns stay in the history and approved ones must be "
                          "cancelled first.")
         con.execute("DELETE FROM campaigns WHERE id=?", (cid,))
@@ -549,17 +599,43 @@ def admin_cancel(cid: int, user: str = Depends(_admin)):
     return _page(f"Campaign <b>{html_mod.escape(r['name'])}</b> cancelled before sending.")
 
 
+from datetime import datetime as _dt, timedelta as _td
+
+
+def _sched_to_utc(schedule_local: str | None) -> str | None:
+    """Erbil local (UTC+3, no DST) datetime-local value -> UTC ISO, or None."""
+    if not schedule_local:
+        return None
+    try:
+        return (_dt.fromisoformat(schedule_local) - _td(hours=3)).strftime(
+            "%Y-%m-%dT%H:%M:00")
+    except ValueError:
+        return None
+
+
+def _sched_to_local(scheduled_at: str | None) -> str:
+    if not scheduled_at:
+        return ""
+    try:
+        return (_dt.fromisoformat(scheduled_at) + _td(hours=3)).strftime(
+            "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return ""
+
+
 def _safe_return_action(action: str) -> str:
     if action == "/admin/create" or re.fullmatch(r"/admin/edit/\d+", action or ""):
         return action
     return "/admin/create"
 
 
-def _hidden_fields(name, subject, heading, body, audience, return_action):
+def _hidden_fields(name, subject, heading, body, audience, return_action,
+                   schedule_local=""):
     f = ""
     for k, v in (("name", name), ("subject", subject), ("heading", heading),
                  ("body", body), ("audience", audience),
-                 ("return_action", return_action)):
+                 ("return_action", return_action),
+                 ("schedule_local", schedule_local)):
         f += (f"<input type='hidden' name='{k}' "
               f"value=\"{html_mod.escape(v or '', quote=True)}\">")
     return f
@@ -569,15 +645,18 @@ def _hidden_fields(name, subject, heading, body, audience, return_action):
 def admin_preview(user: str = Depends(_admin), name: str = Form(...),
                   subject: str = Form(...), heading: str = Form(...),
                   body: str = Form(...), audience: str = Form("dolce"),
-                  return_action: str = Form("/admin/create")):
+                  return_action: str = Form("/admin/create"),
+                  schedule_local: str = Form("")):
     return_action = _safe_return_action(return_action)
-    preview_html = render.render(_campaign_html(heading, body),
-                                 {"first_name": "Maya", "unsub_token": "preview"})
+    sample = {"first_name": "Maya", "unsub_token": "preview"}
+    preview_html = render.render(_campaign_html(heading, body), sample)
     m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
     inner = m.group(1) if m else preview_html
+    subject = render.render(subject, sample) if "{{" in subject else subject
     confirm_label = ("LOOKS GOOD - CREATE" if return_action == "/admin/create"
                      else "LOOKS GOOD - SAVE")
-    hidden = _hidden_fields(name, subject, heading, body, audience, return_action)
+    hidden = _hidden_fields(name, subject, heading, body, audience, return_action,
+                            schedule_local)
     btn = ("padding:14px 26px;border-radius:8px;font-size:14px;letter-spacing:1px;"
            "cursor:pointer;")
     return HTMLResponse(f"""
@@ -621,12 +700,13 @@ def admin_preview(user: str = Depends(_admin), name: str = Form(...),
 def admin_compose(user: str = Depends(_admin), name: str = Form(...),
                   subject: str = Form(...), heading: str = Form(...),
                   body: str = Form(...), audience: str = Form("dolce"),
-                  return_action: str = Form("/admin/create")):
+                  return_action: str = Form("/admin/create"),
+                  schedule_local: str = Form("")):
     return_action = _safe_return_action(return_action)
     title = "New campaign" if return_action == "/admin/create" else "Edit campaign"
     button = "CREATE CAMPAIGN" if return_action == "/admin/create" else "SAVE &amp; RESEND FOR APPROVAL"
     vals = {"name": name, "subject": subject, "heading": heading,
-            "body": body, "audience": audience}
+            "body": body, "audience": audience, "schedule_local": schedule_local}
     brand = audience if audience in ("dolce", "polished", "core") else "dolce"
     return _render_admin(action=return_action, title=title, button=button,
                          values=vals, brand=brand)
@@ -636,9 +716,36 @@ def admin_compose(user: str = Depends(_admin), name: str = Form(...),
 def admin_create(user: str = Depends(_admin), name: str = Form(...),
                  subject: str = Form(...), heading: str = Form(...),
                  body: str = Form(...), audience: str = Form("all"),
-                 return_action: str = Form(None)):
+                 return_action: str = Form(None), schedule_local: str = Form("")):
     campaigns.create_from_html(name, subject, _campaign_html(heading, body),
-                               heading=heading, body_raw=body, audience=audience)
+                               heading=heading, body_raw=body, audience=audience,
+                               scheduled_at=_sched_to_utc(schedule_local))
+    extra = (" It is scheduled - after approval it waits for the send time."
+             if schedule_local else "")
     return _page(f"Your campaign <b>{html_mod.escape(name)}</b> is created.<br><br>"
                  f"Now check <b>{config.APPROVER_EMAIL}</b> - the approval email is on its "
-                 "way. Nothing sends until you press Approve there.")
+                 f"way. Nothing sends until you press Approve there.{extra}")
+
+
+@app.post("/admin/draft")
+def admin_draft(user: str = Depends(_admin), name: str = Form(...),
+                subject: str = Form(...), heading: str = Form(...),
+                body: str = Form(...), audience: str = Form("all"),
+                return_action: str = Form(None), schedule_local: str = Form("")):
+    campaigns.create_from_html(name, subject, _campaign_html(heading, body),
+                               heading=heading, body_raw=body, audience=audience,
+                               as_draft=True,
+                               scheduled_at=_sched_to_utc(schedule_local))
+    return _page(f"Draft <b>{html_mod.escape(name)}</b> saved. No emails were sent - "
+                 "find it under Recent campaigns to keep editing, or press "
+                 "'submit for approval' when it's ready.")
+
+
+@app.post("/admin/submit/{cid}")
+def admin_submit(cid: int, user: str = Depends(_admin)):
+    try:
+        campaigns.submit_draft(cid)
+    except ValueError as e:
+        return _page(str(e))
+    return _page(f"Submitted. Check <b>{config.APPROVER_EMAIL}</b> for the test copy "
+                 "and the approval email - nothing sends until Approve is pressed.")

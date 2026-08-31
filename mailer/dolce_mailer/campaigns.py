@@ -17,20 +17,40 @@ def create(name: str, subject: str, html_path: str):
 
 
 def create_from_html(name: str, subject: str, html: str,
-                     heading: str = "", body_raw: str = "", audience: str = "all"):
+                     heading: str = "", body_raw: str = "", audience: str = "all",
+                     as_draft: bool = False, scheduled_at: str | None = None):
     token = db.new_token()
+    status = "draft" if as_draft else "pending"
     with db.connect() as con:
         con.execute(
-            "INSERT INTO campaigns (name, subject, html, token, heading, body_raw, audience) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (name, subject, html, token, heading, body_raw, audience))
+            "INSERT INTO campaigns (name, subject, html, token, heading, body_raw, "
+            "audience, status, scheduled_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (name, subject, html, token, heading, body_raw, audience, status,
+             scheduled_at))
         n = len(db.eligible_contacts(con, audience))
-    _send_review(name, subject, html, token, n, audience)
-    print(f"campaign '{name}' created; approval email sent to {config.APPROVER_EMAIL}")
+    if not as_draft:
+        _send_review(name, subject, html, token, n, audience, scheduled_at)
+    print(f"campaign '{name}' created ({status})")
+
+
+def submit_draft(cid: int):
+    """Move a draft to pending and send the review emails."""
+    token = db.new_token()
+    with db.connect() as con:
+        r = con.execute("SELECT * FROM campaigns WHERE id=?", (cid,)).fetchone()
+        if not r or r["status"] != "draft":
+            raise ValueError("only drafts can be submitted for approval")
+        con.execute("UPDATE campaigns SET status='pending', token=? WHERE id=?",
+                    (token, cid))
+        n = len(db.eligible_contacts(con, r["audience"] or "all"))
+    _send_review(r["name"], r["subject"], r["html"], token, n,
+                 r["audience"] or "all",
+                 r["scheduled_at"] if "scheduled_at" in r.keys() else None)
 
 
 def update_campaign(cid: int, name: str, subject: str, html: str,
-                    heading: str, body_raw: str, audience: str = "all"):
+                    heading: str, body_raw: str, audience: str = "all",
+                    scheduled_at: str | None = None):
     """Edit a pending or mid-send (approved) campaign: new content, fresh
     token (old links die), back to pending for re-approval. People already
     sent this campaign keep their record and are never re-sent; after
@@ -38,22 +58,37 @@ def update_campaign(cid: int, name: str, subject: str, html: str,
     token = db.new_token()
     with db.connect() as con:
         row = con.execute("SELECT status FROM campaigns WHERE id=?", (cid,)).fetchone()
-        if not row or row["status"] not in ("pending", "approved"):
+        if not row or row["status"] not in ("draft", "pending", "approved"):
             raise ValueError("Sent campaigns can't be edited - use Duplicate. "
                              "Rejected ones: delete and recreate.")
+        stays_draft = row["status"] == "draft"
+        new_status = "draft" if stays_draft else "pending"
         con.execute(
             "UPDATE campaigns SET name=?, subject=?, html=?, token=?, heading=?, "
-            "body_raw=?, audience=?, status='pending' WHERE id=?",
-            (name, subject, html, token, heading, body_raw, audience, cid))
+            "body_raw=?, audience=?, scheduled_at=?, status=? WHERE id=?",
+            (name, subject, html, token, heading, body_raw, audience,
+             scheduled_at, new_status, cid))
         n = len(db.eligible_contacts(con, audience))
-    _send_review(name, subject, html, token, n, audience)
+    if not stays_draft:
+        _send_review(name, subject, html, token, n, audience, scheduled_at)
+    return stays_draft
 
 
 AUDIENCE_LABELS = {"all": "All clients", "dolce": "Dolce (clinic)",
                    "polished": "Polished (salon)", "core": "Core (studio)"}
 
 
-def _send_review(name, subject, html, token, n, audience="all"):
+def _send_review(name, subject, html, token, n, audience="all",
+                 scheduled_at=None):
+    when = ""
+    if scheduled_at:
+        try:
+            from datetime import datetime, timedelta
+            local = datetime.fromisoformat(scheduled_at) + timedelta(hours=3)
+            when = (f"<br>Scheduled: <b>{local.strftime('%d %b %Y, %H:%M')} "
+                    f"(Erbil time)</b> - it waits until then after approval.")
+        except ValueError:
+            pass
     approve = f"{config.APP_BASE_URL}/approve/{token}"
     reject = f"{config.APP_BASE_URL}/reject/{token}"
     preview_contact = {"first_name": "Maya", "unsub_token": "preview"}
@@ -67,7 +102,7 @@ def _send_review(name, subject, html, token, n, audience="all"):
           Approve campaign: {name}</h2>
         <p style="color:#4a4a4a;">Subject: <b>{subject}</b><br>
            Audience: <b>{AUDIENCE_LABELS.get(audience, audience)}</b><br>
-           Recipients: <b>{n}</b> consented client(s).</p>
+           Recipients: <b>{n}</b> consented client(s).{when}</p>
         <p style="color:#4a4a4a;">A test copy of the exact email was just sent to this
            inbox with the subject "[TEST] {subject}" - open it first and check how it looks.</p>
         <p style="margin:28px 0;">
@@ -90,7 +125,9 @@ def _send_review(name, subject, html, token, n, audience="all"):
 def send_approved():
     preflight.check()
     with db.connect() as con:
-        rows = con.execute("SELECT * FROM campaigns WHERE status='approved'").fetchall()
+        rows = con.execute(
+            "SELECT * FROM campaigns WHERE status='approved' AND "
+            "(scheduled_at IS NULL OR scheduled_at <= datetime('now'))").fetchall()
         for camp in rows:
             kind = f"campaign:{camp['id']}"
             sent, remaining, failures = 0, 0, []
@@ -105,7 +142,7 @@ def send_approved():
                     continue
                 unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
                 try:
-                    send.send_email(c["email"], camp["subject"],
+                    send.send_email(c["email"], render.render(camp["subject"], c),
                                     render.render(camp["html"], c), unsub)
                 except Exception as e:
                     failures.append(f"{c['email']}: {e}")
