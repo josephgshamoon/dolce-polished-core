@@ -224,6 +224,7 @@ ADMIN_PAGE = """
       <label>Campaign name <span style="color:#b5a7a9;text-transform:none;letter-spacing:0;">(just for you)</span></label>
       <input name="name" required placeholder="e.g. September glow offer" value="%%V_NAME%%">
       <input type="hidden" name="audience" value="%%AUD%%">
+      <input type="hidden" name="return_action" value="%%ACTION%%">
       <label>Subject line</label>
       <input name="subject" required placeholder="e.g. A little something special for our clients" value="%%V_SUBJECT%%">
       <div class="hint">This is what appears in their inbox - keep it warm and short.</div>
@@ -233,7 +234,12 @@ ADMIN_PAGE = """
       <label>Message</label>
       <textarea name="body" rows="9" required
         placeholder="Write naturally, like a note to a client.&#10;&#10;Leave a blank line to start a new paragraph. Every email automatically starts with the client's name and ends with the WhatsApp button and your clinic details.">%%V_BODY%%</textarea>
-      <button type="submit">%%BUTTON%%</button>
+      <div style="display:flex;gap:12px;margin-top:30px;">
+        <button type="submit" formaction="/admin/preview"
+          style="margin-top:0;background:transparent;border:1px solid var(--gold);
+                 color:var(--gold);">PREVIEW FIRST</button>
+        <button type="submit" style="margin-top:0;">%%BUTTON%%</button>
+      </div>
     </form>
 %%BIRTHDAYS_SECTION%%
     <div class="recent">
@@ -393,7 +399,8 @@ def admin_edit_form(cid: int, user: str = Depends(_admin)):
 @app.post("/admin/edit/{cid}")
 def admin_edit(cid: int, user: str = Depends(_admin), name: str = Form(...),
                subject: str = Form(...), heading: str = Form(...),
-               body: str = Form(...), audience: str = Form("all")):
+               body: str = Form(...), audience: str = Form("all"),
+               return_action: str = Form(None)):
     try:
         campaigns.update_campaign(cid, name, subject,
                                   _campaign_html(heading, body), heading, body,
@@ -542,10 +549,94 @@ def admin_cancel(cid: int, user: str = Depends(_admin)):
     return _page(f"Campaign <b>{html_mod.escape(r['name'])}</b> cancelled before sending.")
 
 
+def _safe_return_action(action: str) -> str:
+    if action == "/admin/create" or re.fullmatch(r"/admin/edit/\d+", action or ""):
+        return action
+    return "/admin/create"
+
+
+def _hidden_fields(name, subject, heading, body, audience, return_action):
+    f = ""
+    for k, v in (("name", name), ("subject", subject), ("heading", heading),
+                 ("body", body), ("audience", audience),
+                 ("return_action", return_action)):
+        f += (f"<input type='hidden' name='{k}' "
+              f"value=\"{html_mod.escape(v or '', quote=True)}\">")
+    return f
+
+
+@app.post("/admin/preview")
+def admin_preview(user: str = Depends(_admin), name: str = Form(...),
+                  subject: str = Form(...), heading: str = Form(...),
+                  body: str = Form(...), audience: str = Form("dolce"),
+                  return_action: str = Form("/admin/create")):
+    return_action = _safe_return_action(return_action)
+    preview_html = render.render(_campaign_html(heading, body),
+                                 {"first_name": "Maya", "unsub_token": "preview"})
+    m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
+    inner = m.group(1) if m else preview_html
+    confirm_label = ("LOOKS GOOD - CREATE" if return_action == "/admin/create"
+                     else "LOOKS GOOD - SAVE")
+    hidden = _hidden_fields(name, subject, heading, body, audience, return_action)
+    btn = ("padding:14px 26px;border-radius:8px;font-size:14px;letter-spacing:1px;"
+           "cursor:pointer;")
+    return HTMLResponse(f"""
+<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Preview - {html_mod.escape(name)}</title>
+<link rel='icon' type='image/png' href='/static/dolce-logo.png'>
+<style>
+  :root{{--page:#f5eff0;--card:#fff;--ink:#2b2b2b;--body:#4a4a4a;--gold:#c2a273;
+        --faint:#a99a9c;--line:#ead9dc;}}
+  @media (prefers-color-scheme: dark){{
+    :root{{--page:#191516;--card:#231e1f;--ink:#f0e9e6;--body:#cfc5c2;
+          --gold:#d0b285;--faint:#877b7d;--line:#3a3132;}}}}
+  body{{margin:0;background:var(--page);font-family:Arial,sans-serif;color:var(--body);}}
+</style>
+<body>
+  <div style="max-width:700px;margin:30px auto;padding:0 14px;">
+    <div style="background:var(--card);border-radius:12px;padding:22px 26px;">
+      <h1 style="font-family:Georgia,serif;font-weight:normal;font-size:21px;
+          color:var(--ink);margin:0 0 4px;">Preview - nothing is created yet</h1>
+      <p style="font-size:13.5px;color:var(--faint);margin:0 0 16px;">
+        Subject: {html_mod.escape(subject)}</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <form method="post" action="/admin/compose" style="margin:0;">{hidden}
+          <button style="{btn}background:transparent;border:1px solid var(--gold);
+            color:var(--gold);">KEEP EDITING</button></form>
+        <form method="post" action="{return_action}" style="margin:0;">{hidden}
+          <button style="{btn}background:var(--gold);border:0;color:#fff;">
+            {confirm_label}</button></form>
+      </div>
+    </div>
+    <p style="font-family:Georgia,serif;color:var(--ink);font-size:16px;
+       margin:22px 0 8px;">How it will look to clients:</p>
+    <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden;
+         background:#f5eff0;">{inner}</div>
+  </div>
+</body>""")
+
+
+@app.post("/admin/compose")
+def admin_compose(user: str = Depends(_admin), name: str = Form(...),
+                  subject: str = Form(...), heading: str = Form(...),
+                  body: str = Form(...), audience: str = Form("dolce"),
+                  return_action: str = Form("/admin/create")):
+    return_action = _safe_return_action(return_action)
+    title = "New campaign" if return_action == "/admin/create" else "Edit campaign"
+    button = "CREATE CAMPAIGN" if return_action == "/admin/create" else "SAVE &amp; RESEND FOR APPROVAL"
+    vals = {"name": name, "subject": subject, "heading": heading,
+            "body": body, "audience": audience}
+    brand = audience if audience in ("dolce", "polished", "core") else "dolce"
+    return _render_admin(action=return_action, title=title, button=button,
+                         values=vals, brand=brand)
+
+
 @app.post("/admin/create")
 def admin_create(user: str = Depends(_admin), name: str = Form(...),
                  subject: str = Form(...), heading: str = Form(...),
-                 body: str = Form(...), audience: str = Form("all")):
+                 body: str = Form(...), audience: str = Form("all"),
+                 return_action: str = Form(None)):
     campaigns.create_from_html(name, subject, _campaign_html(heading, body),
                                heading=heading, body_raw=body, audience=audience)
     return _page(f"Your campaign <b>{html_mod.escape(name)}</b> is created.<br><br>"
