@@ -194,6 +194,11 @@ ADMIN_PAGE = """
         color:var(--ink);background:var(--field);transition:border .15s;}
   input:focus,textarea:focus{outline:none;border-color:var(--gold);}
   input::placeholder,textarea::placeholder{color:var(--faint);}
+  .greet{border:1px solid var(--field-border);border-bottom:1px dashed var(--field-border);
+        border-radius:8px 8px 0 0;background:var(--chipbg);padding:11px 14px;
+        font-size:15px;color:var(--ink);}
+  .greet small{font-size:12px;color:var(--faint);}
+  .greet+textarea{border-radius:0 0 8px 8px;border-top:none;}
   .hint{font-size:12.5px;color:var(--faint);margin-top:6px;}
   button{width:100%;margin-top:30px;background:var(--gold);color:#fff;border:0;
         border-radius:8px;padding:16px;font-size:15px;letter-spacing:1.5px;cursor:pointer;}
@@ -251,8 +256,11 @@ ADMIN_PAGE = """
           field you last clicked (subject, heading or message) - becomes each
           client's own name</span>
       </div>
+      <div class="greet">Hi <span style="color:var(--gold);">{{first_name}}</span>,
+        <small>&nbsp; built into every email - becomes each client's own name, so no
+        need to type a greeting below</small></div>
       <textarea name="body" rows="9" required
-        placeholder="Write naturally, like a note to a client.&#10;&#10;Leave a blank line to start a new paragraph. Every email automatically starts with the client's name and ends with the WhatsApp button and your clinic details.">%%V_BODY%%</textarea>
+        placeholder="Write naturally, like a note to a client.&#10;&#10;Leave a blank line to start a new paragraph. Every email ends with the WhatsApp button and your clinic details.">%%V_BODY%%</textarea>
       <label>Send time <span style="color:#b5a7a9;text-transform:none;letter-spacing:0;">(optional)</span></label>
       <input type="datetime-local" name="schedule_local" value="%%V_SCHED%%">
       <div class="hint">Leave empty to send right after approval. Times are Erbil time -
@@ -529,8 +537,14 @@ def _auto_form_page(key: str, slug: str, subject: str, heading: str, body: str,
   <label>Heading</label>
   <input name='heading' required value="{html_mod.escape(heading, quote=True)}">
   <label>Message <span style='color:var(--faint);text-transform:none;letter-spacing:0;'>(blank line = new paragraph; {{{{first_name}}}} becomes the client's name)</span></label>
+  <div style='border:1px solid var(--fb);border-bottom:1px dashed var(--fb);
+    border-radius:8px 8px 0 0;background:var(--field);padding:11px 12px;
+    font-size:15px;color:var(--ink);'>Hi <span style='color:var(--gold);'>{{{{first_name}}}}</span>,
+    <small style='font-size:12px;color:var(--faint);'>&nbsp; built into every email - becomes
+    each client's own name, so no need to type a greeting below</small></div>
   <textarea name='body' rows='11' required
-    style='width:100%;box-sizing:border-box;border:1px solid var(--fb);border-radius:8px;
+    style='width:100%;box-sizing:border-box;border:1px solid var(--fb);border-top:none;
+    border-radius:0 0 8px 8px;
     padding:12px;font-size:15px;background:var(--field);color:var(--ink);font-family:inherit;'
     >{html_mod.escape(body)}</textarea>
   <div style='display:flex;gap:12px;'>
