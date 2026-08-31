@@ -376,7 +376,7 @@ def _render_admin(action="/admin/create", title="New campaign",
                 f"<span>{actions}</span>"
                 f"<span class='pill' style='color:{fg}'>{r['status']}</span>"
                 f"<span class='when'>{sent_counts[r['id']]} sent &middot; "
-                f"{r['created_at'][:16]}</span></div>")
+                f"{_erbil(r['created_at'])}</span></div>")
         recent = "".join(parts)
     else:
         recent = ("<p style='color:#a99a9c;font-size:14px;'>No "
@@ -486,7 +486,7 @@ def auto_list(user: str = Depends(_admin)):
         f"<div class='row'><span><a href='/admin/auto/{k.replace(':', '-')}' "
         f"style='color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);'>"
         f"{label}</a></span>"
-        f"<span class='when'>updated {(rows[k]['updated_at'] or '')[:16] if k in rows else '-'}</span></div>"
+        f"<span class='when'>updated {_erbil(rows[k]['updated_at']) if k in rows else '-'}</span></div>"
         for k, label in AUTO_LABELS.items())
     page = f"""<!doctype html><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
@@ -811,7 +811,7 @@ def admin_view(cid: int, user: str = Depends(_admin)):
             f"padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;'>"
             f"<span>{html_mod.escape(rc['first_name'] or '')}</span>"
             f"<span style='color:var(--faint)'>{html_mod.escape(rc['email'] or 'contact removed')}</span>"
-            f"<span style='color:var(--faint);white-space:nowrap'>{(rc['sent_at'] or '')[:16]}</span></div>"
+            f"<span style='color:var(--faint);white-space:nowrap'>{_erbil(rc['sent_at'])}</span></div>"
             for rc in recipients)
         delivery = (f"<details style='margin-top:14px;'><summary style='cursor:pointer;"
                     f"color:var(--gold);font-size:14px;'>Sent to {n_sent} client(s) - "
@@ -900,7 +900,7 @@ def admin_view(cid: int, user: str = Depends(_admin)):
         Subject: {html_mod.escape(r['subject'])} &nbsp;&middot;&nbsp;
         <span style="color:{fg};text-transform:uppercase;font-size:11px;
         letter-spacing:1px;border:1px solid currentColor;border-radius:999px;
-        padding:3px 10px;">{st}</span> &nbsp;&middot;&nbsp; {r['created_at'][:16]}</p>
+        padding:3px 10px;">{st}</span> &nbsp;&middot;&nbsp; {_erbil(r['created_at'])}</p>
       <p style="margin:0 0 8px;">{''.join(acts)}</p>
       {note}{sched_line}{plan_line}{delivery}
     </div>
@@ -986,6 +986,17 @@ def _sched_to_utc(schedule_local: str | None) -> str | None:
             "%Y-%m-%dT%H:%M:00")
     except ValueError:
         return None
+
+
+def _erbil(ts: str | None) -> str:
+    """DB timestamp (UTC) -> 'YYYY-MM-DD HH:MM' in Erbil time (UTC+3, no DST)."""
+    if not ts:
+        return ""
+    try:
+        return (_dt.fromisoformat(ts.replace("T", " ")[:19]) + _td(hours=3)).strftime(
+            "%Y-%m-%d %H:%M")
+    except ValueError:
+        return ts[:16]
 
 
 def _sched_to_local(scheduled_at: str | None) -> str:
