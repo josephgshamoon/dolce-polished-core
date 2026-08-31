@@ -271,7 +271,7 @@ ADMIN_PAGE = """
     </form>
 %%BIRTHDAYS_SECTION%%
     <div class="recent">
-      <h2>Recent campaigns</h2>
+      <h2>%%RECENT_TITLE%% %%ARCHTOGGLE%%</h2>
       %%RECENT%%
     </div>
   </div>
@@ -295,7 +295,8 @@ BRAND_TITLES = {"dolce": "Dolce (clinic)", "polished": "Polished (salon)",
 
 
 def _render_admin(action="/admin/create", title="New campaign",
-                  button="CREATE CAMPAIGN", values=None, brand="dolce"):
+                  button="CREATE CAMPAIGN", values=None, brand="dolce",
+                  show_archived=False):
     v = values or {}
     tabs = "" if SINGLE_BRAND else "".join(
         f"<a class='tab{' active' if key == brand else ''}' "
@@ -303,8 +304,12 @@ def _render_admin(action="/admin/create", title="New campaign",
     with db.connect() as con:
         rows = con.execute(
             "SELECT id, name, status, created_at FROM campaigns "
-            "WHERE COALESCE(audience,'all') = ? ORDER BY id DESC LIMIT 10",
-            (brand,)).fetchall()
+            "WHERE COALESCE(audience,'all') = ? AND COALESCE(archived,0) = ? "
+            "ORDER BY id DESC LIMIT 10",
+            (brand, 1 if show_archived else 0)).fetchall()
+        n_archived = con.execute(
+            "SELECT COUNT(*) FROM campaigns WHERE COALESCE(audience,'all') = ? "
+            "AND COALESCE(archived,0) = 1", (brand,)).fetchone()[0]
         sent_counts = {r["id"]: con.execute(
             "SELECT COUNT(*) FROM sends WHERE kind=?",
             (f"campaign:{r['id']}",)).fetchone()[0] for r in rows}
@@ -335,6 +340,12 @@ def _render_admin(action="/admin/create", title="New campaign",
                            f"<form method='post' action='/admin/cancel/{r['id']}' "
                            f"style='display:inline'><button style='all:unset;color:#c96060;"
                            f"font-size:12px;cursor:pointer;'>cancel send</button></form>")
+            elif r["status"] == "sent":
+                verb = "unarchive" if show_archived else "archive"
+                actions = (f"<form method='post' action='/admin/{verb}/{r['id']}' "
+                           f"style='display:inline'><button style='all:unset;"
+                           f"color:#a08d63;font-size:12px;cursor:pointer;'>{verb}"
+                           f"</button></form>")
             elif r["status"] == "rejected":
                 actions = (f"<form method='post' action='/admin/delete/{r['id']}' "
                            f"style='display:inline'><button style='all:unset;color:#c96060;"
@@ -383,6 +394,15 @@ def _render_admin(action="/admin/create", title="New campaign",
         bd_section = ""
     logo_html = ('<img src="/static/dolce-logo.png" alt="Dolce Aesthetic Clinic" '
                  'style="width:190px;max-width:70%;">' if brand == "dolce" else "")
+    if show_archived:
+        recent_title = "Archived campaigns"
+        arch_toggle = (f"<a href='/admin?brand={brand}' style='font-size:12px;"
+                       f"color:var(--gold);text-decoration:none;'>back to recent</a>")
+    else:
+        recent_title = "Recent campaigns"
+        arch_toggle = (f"<a href='/admin?brand={brand}&archived=1' style='font-size:12px;"
+                       f"color:var(--faint);text-decoration:none;'>archived ({n_archived})</a>"
+                       if n_archived else "")
     page = (ADMIN_PAGE.replace("%%LOGO%%", logo_html)
                       .replace("%%BIRTHDAYS_SECTION%%", bd_section)
                       .replace("%%TABS%%", tabs)
@@ -635,10 +655,12 @@ def admin_logout():
 
 
 @app.get("/admin")
-def admin_form(user: str = Depends(_admin), brand: str = "dolce"):
+def admin_form(user: str = Depends(_admin), brand: str = "dolce",
+               archived: int = 0):
     if brand not in ("dolce", "polished", "core"):
         brand = "dolce"
-    return _render_admin(title=f"New campaign - {BRAND_TITLES[brand]}", brand=brand)
+    return _render_admin(title=f"New campaign - {BRAND_TITLES[brand]}", brand=brand,
+                         show_archived=bool(archived))
 
 
 @app.get("/admin/edit/{cid}")
@@ -746,6 +768,13 @@ def admin_view(cid: int, user: str = Depends(_admin)):
                     f"color:#fff;border:0;cursor:pointer;'>CANCEL SEND</button></form>")
     acts.append(f"<a href='/admin/duplicate/{cid}' style='{btn}background:transparent;"
                 f"border:1px solid #c2a273;color:#c2a273;'>DUPLICATE</a>")
+    if st == "sent":
+        arch = bool(r["archived"]) if "archived" in keys else False
+        verb = "unarchive" if arch else "archive"
+        acts.append(f"<form method='post' action='/admin/{verb}/{cid}' "
+                    f"style='display:inline'><button style='{btn}background:transparent;"
+                    f"border:1px solid #a08d63;color:#a08d63;cursor:pointer;'>"
+                    f"{verb.upper()}</button></form>")
     note = ""
     if st == "sent":
         note = ("<p style='color:#a99a9c;font-size:12.5px;'>Sent campaigns are kept "
@@ -815,6 +844,29 @@ def admin_delete(cid: int, user: str = Depends(_admin)):
                          "cancelled first.")
         con.execute("DELETE FROM campaigns WHERE id=?", (cid,))
     return _page(f"Campaign <b>{html_mod.escape(r['name'])}</b> deleted. Nothing was sent.")
+
+
+@app.post("/admin/archive/{cid}")
+def admin_archive(cid: int, user: str = Depends(_admin)):
+    with db.connect() as con:
+        r = con.execute("SELECT status, name FROM campaigns WHERE id=?",
+                        (cid,)).fetchone()
+        if not r or r["status"] != "sent":
+            return _page("Only sent campaigns can be archived.")
+        con.execute("UPDATE campaigns SET archived=1 WHERE id=?", (cid,))
+    return _page(f"<b>{html_mod.escape(r['name'])}</b> archived - hidden from the "
+                 "recent list, kept in history. Find it under 'archived' on the "
+                 "campaigns page.")
+
+
+@app.post("/admin/unarchive/{cid}")
+def admin_unarchive(cid: int, user: str = Depends(_admin)):
+    with db.connect() as con:
+        r = con.execute("SELECT name FROM campaigns WHERE id=?", (cid,)).fetchone()
+        if not r:
+            return _page("Campaign not found.")
+        con.execute("UPDATE campaigns SET archived=0 WHERE id=?", (cid,))
+    return _page(f"<b>{html_mod.escape(r['name'])}</b> restored to the recent list.")
 
 
 @app.post("/admin/cancel/{cid}")

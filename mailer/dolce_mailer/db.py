@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     body_raw    TEXT DEFAULT '',
     audience    TEXT DEFAULT 'all',
     scheduled_at TEXT,            -- UTC ISO; approved campaigns wait for this
+    archived    INTEGER DEFAULT 0,
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
     decided_at  TEXT,
     sent_at     TEXT
@@ -80,6 +81,8 @@ def init():
             con.execute("ALTER TABLE campaigns ADD COLUMN audience TEXT DEFAULT 'all'")
         if "scheduled_at" not in cols:
             con.execute("ALTER TABLE campaigns ADD COLUMN scheduled_at TEXT")
+        if "archived" not in cols:
+            con.execute("ALTER TABLE campaigns ADD COLUMN archived INTEGER DEFAULT 0")
         con.execute("UPDATE sends SET kind='welcome:dolce' WHERE kind='welcome'")
         _seed_auto_templates(con)
         # bootstrap: seed the first portal user from the legacy env credential
