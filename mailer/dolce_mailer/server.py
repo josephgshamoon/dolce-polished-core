@@ -220,6 +220,7 @@ ADMIN_PAGE = """
     <div style="display:flex;justify-content:flex-end;gap:14px;padding:12px 16px 0;">
       <a href="/admin" style="font-size:12px;color:var(--muted);text-decoration:none;">&#8635; Refresh</a>
       <a href="/admin/auto" style="font-size:12px;color:var(--gold);text-decoration:none;">Automatic emails</a>
+      <a href="/admin/unsubscribed" style="font-size:12px;color:var(--muted);text-decoration:none;">Unsubscribed</a>
       <a href="/admin/password" style="font-size:12px;color:var(--muted);text-decoration:none;">Password</a>
       <a href="/admin/logout" style="font-size:12px;color:var(--muted);text-decoration:none;">Log out</a>
     </div>
@@ -506,6 +507,58 @@ got one are never re-sent.</p>
 border-bottom:1px solid var(--line);font-size:14.5px;}}
 .when{{color:var(--faint);font-size:12px;white-space:nowrap;}}</style>
 {items}
+</div></body>"""
+    return HTMLResponse(page)
+
+
+@app.get("/admin/unsubscribed")
+def unsubscribed_list(user: str = Depends(_admin)):
+    with db.connect() as con:
+        unsubbed = con.execute(
+            "SELECT first_name, email, labels FROM contacts "
+            "WHERE unsubscribed=1 ORDER BY first_name COLLATE NOCASE").fetchall()
+        suppressed = con.execute(
+            "SELECT email, reason FROM suppression ORDER BY email").fetchall()
+    def _brands(labels):
+        found = [b.capitalize() for b in db.BRAND_KEYS if b in (labels or "")]
+        return ", ".join(found) or "-"
+    if unsubbed:
+        rows = "".join(
+            f"<div class='row'><span>{html_mod.escape(r['first_name'] or '')}</span>"
+            f"<span style='color:var(--faint)'>{html_mod.escape(r['email'] or '')}</span>"
+            f"<span class='when'>{_brands(r['labels'])}</span></div>"
+            for r in unsubbed)
+    else:
+        rows = ("<p style='color:var(--faint);font-size:14px;'>Nobody has "
+                "unsubscribed.</p>")
+    supp_html = ""
+    if suppressed:
+        supp_rows = "".join(
+            f"<div class='row'><span style='color:var(--faint)'>"
+            f"{html_mod.escape(s['email'])}</span>"
+            f"<span class='when'>{html_mod.escape(s['reason'] or '')}</span></div>"
+            for s in suppressed)
+        supp_html = (f"<h2 style='margin-top:34px;'>Blocked addresses "
+                     f"({len(suppressed)})</h2>"
+                     "<p style='font-size:13px;color:var(--faint);'>These bounced "
+                     "or complained - the system never emails them either.</p>"
+                     + supp_rows)
+    page = f"""<!doctype html><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Unsubscribed clients</title>
+<link rel='icon' type='image/png' href='/static/dolce-logo.png'>{_FORM_CSS}
+<body><div class='card' style='max-width:640px;'>
+<p><a href='/admin' style='color:var(--gold);text-decoration:none;font-size:13px;'>&larr; Back to campaigns</a></p>
+<h2>Unsubscribed clients ({len(unsubbed)})</h2>
+<p style='font-size:13.5px;color:var(--faint);'>These clients clicked Unsubscribe.
+They still appear in Wix with their labels, but the system automatically skips
+them for every email - welcomes, birthdays and campaigns, all brands. Please
+don't email them manually either.</p>
+<style>.row{{display:flex;justify-content:space-between;gap:10px;padding:11px 0;
+border-bottom:1px solid var(--line);font-size:14px;}}
+.when{{color:var(--faint);font-size:12px;white-space:nowrap;}}</style>
+{rows}
+{supp_html}
 </div></body>"""
     return HTMLResponse(page)
 
