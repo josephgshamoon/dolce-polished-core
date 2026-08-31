@@ -131,7 +131,10 @@ async def brevo_webhook(request: Request):
     return {"ok": True}
 
 
-CAMPAIGN_SHELL = Path(__file__).parent / "templates" / "campaign.html"
+_TPL = Path(__file__).parent / "templates"
+CAMPAIGN_SHELLS = {"polished": _TPL / "campaign-polished.html",
+                   "core": _TPL / "campaign-core.html"}
+DEFAULT_SHELL = _TPL / "campaign.html"
 
 STATUS_COLORS = {"draft": "#8a8a8a", "pending": "#c9a227", "approved": "#5aa860",
                  "sent": "#a08d63", "rejected": "#c96060"}
@@ -286,11 +289,11 @@ ADMIN_PAGE = """
 </body>"""
 
 
-def _campaign_html(heading: str, body: str) -> str:
+def _campaign_html(heading: str, body: str, audience: str = "all") -> str:
     paragraphs = [html_mod.escape(pp.strip()).replace("\n", "<br>")
                   for pp in body.replace("\r", "").split("\n\n") if pp.strip()]
     body_html = "<br><br>\n".join(paragraphs)
-    shell = CAMPAIGN_SHELL.read_text()
+    shell = CAMPAIGN_SHELLS.get(audience, DEFAULT_SHELL).read_text()
     return (shell.replace("{{heading}}", html_mod.escape(heading))
                  .replace("{{body}}", body_html))
 
@@ -751,7 +754,7 @@ def admin_edit(cid: int, user: str = Depends(_admin), name: str = Form(...),
                return_action: str = Form(None), schedule_local: str = Form("")):
     try:
         stayed_draft = campaigns.update_campaign(
-            cid, name, subject, _campaign_html(heading, body), heading, body,
+            cid, name, subject, _campaign_html(heading, body, audience), heading, body,
             audience=audience, scheduled_at=_sched_to_utc(schedule_local))
     except ValueError as e:
         return _page(str(e))
@@ -990,7 +993,7 @@ def admin_preview(user: str = Depends(_admin), name: str = Form(...),
                   schedule_local: str = Form("")):
     return_action = _safe_return_action(return_action)
     sample = {"first_name": "Maya", "unsub_token": "preview"}
-    preview_html = render.render(_campaign_html(heading, body), sample)
+    preview_html = render.render(_campaign_html(heading, body, audience), sample)
     m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
     inner = m.group(1) if m else preview_html
     subject_display = render.render(subject, sample) if "{{" in subject else subject
@@ -1062,7 +1065,7 @@ def admin_create(user: str = Depends(_admin), name: str = Form(...),
                  subject: str = Form(...), heading: str = Form(...),
                  body: str = Form(...), audience: str = Form("all"),
                  return_action: str = Form(None), schedule_local: str = Form("")):
-    campaigns.create_from_html(name, subject, _campaign_html(heading, body),
+    campaigns.create_from_html(name, subject, _campaign_html(heading, body, audience),
                                heading=heading, body_raw=body, audience=audience,
                                scheduled_at=_sched_to_utc(schedule_local))
     extra = (" It is scheduled - after approval it waits for the send time."
@@ -1077,7 +1080,7 @@ def admin_draft(user: str = Depends(_admin), name: str = Form(...),
                 subject: str = Form(...), heading: str = Form(...),
                 body: str = Form(...), audience: str = Form("all"),
                 return_action: str = Form(None), schedule_local: str = Form("")):
-    campaigns.create_from_html(name, subject, _campaign_html(heading, body),
+    campaigns.create_from_html(name, subject, _campaign_html(heading, body, audience),
                                heading=heading, body_raw=body, audience=audience,
                                as_draft=True,
                                scheduled_at=_sched_to_utc(schedule_local))
