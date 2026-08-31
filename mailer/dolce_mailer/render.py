@@ -39,8 +39,15 @@ def render(html: str, contact, plain: bool = False) -> str:
     """Merge contact fields into html (or, with plain=True, into a plain-text
     string such as a subject line, where HTML-escaping must not apply)."""
     first = (contact["first_name"] or "").strip() or "there"
-    if not plain:
+    review = f"{config.APP_BASE_URL}/r/dolce"
+    if plain:
+        html = html.replace("{{review_link}}", review)
+    else:
         first = html_mod.escape(first)
+        html = html.replace(
+            "{{review_link}}",
+            f'<a href="{review}" style="color:#c2a273;font-weight:bold;">'
+            f"leave us a Google review</a>")
     unsub = f"{config.APP_BASE_URL}/unsubscribe/{contact['unsub_token']}"
     base = config.APP_BASE_URL
     return (html.replace("{{first_name}}", first)

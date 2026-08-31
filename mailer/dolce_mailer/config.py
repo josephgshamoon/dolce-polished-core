@@ -7,6 +7,14 @@ WIX_API_KEY = os.environ.get("WIX_API_KEY", "")
 WIX_SITE_ID = os.environ.get("WIX_SITE_ID", "")
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8080").rstrip("/")
+
+# Official Google review links per brand (from each claimed Business Profile).
+# Emails never link these directly - they go through /r/<brand> so clicks are counted.
+REVIEW_LINKS = {
+    "dolce": "https://g.page/r/CUTokY3u-cvxEAE/review",
+    # "polished": added when its profile is claimed
+    # "core": added when its profile is claimed
+}
 APPROVER_EMAIL = os.environ.get("APPROVER_EMAIL", "dolce.erbil@gmail.com")
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "hello@dolceclinic.com")
 FROM_NAME = os.environ.get("FROM_NAME", "Dolce Aesthetic Clinic")

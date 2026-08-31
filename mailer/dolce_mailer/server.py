@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
@@ -103,6 +103,17 @@ def reject(token: str):
             "UPDATE campaigns SET status='rejected', decided_at=CURRENT_TIMESTAMP "
             "WHERE id=?", (row["id"],))
     return _page("Rejected. Nothing was sent.")
+
+
+@app.get("/r/{brand}")
+def review_redirect(brand: str):
+    """Counted hop to the brand's Google review page - used by emails."""
+    url = config.REVIEW_LINKS.get(brand)
+    if not url:
+        return _page("This link isn't active yet.")
+    with db.connect() as con:
+        con.execute("INSERT INTO review_clicks (brand) VALUES (?)", (brand,))
+    return RedirectResponse(url)
 
 
 @app.get("/unsubscribe/{token}")
@@ -253,9 +264,14 @@ ADMIN_PAGE = """
           style="all:unset;cursor:pointer;font-size:12px;color:var(--gold);
                  border:1px solid var(--gold);border-radius:999px;padding:4px 12px;">
           + client's first name</button>
-        <span style="font-size:11.5px;color:var(--faint);">inserts into whichever
-          field you last clicked (subject, heading or message) - becomes each
-          client's own name</span>
+        <button type="button" onclick="insertPh('{{review_link}}')"
+          style="all:unset;cursor:pointer;font-size:12px;color:var(--gold);
+                 border:1px solid var(--gold);border-radius:999px;padding:4px 12px;">
+          + review link</button>
+        <span style="font-size:11.5px;color:var(--faint);">chips insert into whichever
+          field you last clicked - the name becomes each client's own name; the
+          review link becomes "leave us a Google review" (message only, not the
+          subject)</span>
       </div>
       <div class="greet">Hi <span style="color:var(--gold);">{{first_name}}</span>,
         <small>&nbsp; built into every email - becomes each client's own name, so no

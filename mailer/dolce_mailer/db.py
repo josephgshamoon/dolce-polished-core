@@ -57,6 +57,11 @@ CREATE TABLE IF NOT EXISTS reset_tokens (
     username    TEXT NOT NULL,
     expires     TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS review_clicks (
+    id          INTEGER PRIMARY KEY,
+    brand       TEXT NOT NULL,
+    clicked_at  TEXT DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS suppression (
     email       TEXT PRIMARY KEY,
     reason      TEXT,                     -- bounce | complaint | manual
