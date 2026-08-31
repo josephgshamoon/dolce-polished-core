@@ -411,6 +411,8 @@ def _render_admin(action="/admin/create", title="New campaign",
                        f"color:var(--faint);text-decoration:none;'>archived ({n_archived})</a>"
                        if n_archived else "")
     page = (ADMIN_PAGE.replace("%%LOGO%%", logo_html)
+                      .replace("%%RECENT_TITLE%%", recent_title)
+                      .replace("%%ARCHTOGGLE%%", arch_toggle)
                       .replace("%%BIRTHDAYS_SECTION%%", bd_section)
                       .replace("%%TABS%%", tabs)
                       .replace("%%AUD%%", brand)
