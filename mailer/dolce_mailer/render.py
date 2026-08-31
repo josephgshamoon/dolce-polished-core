@@ -46,8 +46,10 @@ def render(html: str, contact, plain: bool = False) -> str:
         first = html_mod.escape(first)
         html = html.replace(
             "{{review_link}}",
-            f'<a href="{review}" style="color:#c2a273;font-weight:bold;">'
-            f"leave us a Google review</a>")
+            f'<a href="{review}" style="color:#c2a273;font-weight:bold;'
+            f'text-decoration:none;">&#9733;&#9733;&#9733;&#9733;&#9733; '
+            f'<span style="text-decoration:underline;">leave us a Google review'
+            f"</span></a>")
     unsub = f"{config.APP_BASE_URL}/unsubscribe/{contact['unsub_token']}"
     base = config.APP_BASE_URL
     return (html.replace("{{first_name}}", first)
