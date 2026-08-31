@@ -142,7 +142,7 @@ def send_approved():
                     continue
                 unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
                 try:
-                    send.send_email(c["email"], render.render(camp["subject"], c),
+                    send.send_email(c["email"], render.render(camp["subject"], c, plain=True),
                                     render.render(camp["html"], c), unsub)
                 except Exception as e:
                     failures.append(f"{c['email']}: {e}")

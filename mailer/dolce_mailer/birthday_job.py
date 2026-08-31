@@ -30,7 +30,7 @@ def run():
                          if bk in (c["labels"] or ""))
             subject_t, html_template = templates[brand]
             unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
-            send.send_email(c["email"], render.render(subject_t, c),
+            send.send_email(c["email"], render.render(subject_t, c, plain=True),
                             render.render(html_template, c), unsub)
             con.execute("INSERT INTO sends (wix_id, kind) VALUES (?,?)",
                         (c["wix_id"], kind))

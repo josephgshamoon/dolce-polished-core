@@ -34,7 +34,7 @@ def run():
                 html = render.render(html_template, c)
                 unsub = f"{config.APP_BASE_URL}/unsubscribe/{c['unsub_token']}"
                 try:
-                    send.send_email(c["email"], render.render(subject_t, c), html, unsub)
+                    send.send_email(c["email"], render.render(subject_t, c, plain=True), html, unsub)
                 except Exception as e:
                     failures.append(f"{brand} / {c['email']}: {e}")
                     continue

@@ -670,7 +670,7 @@ def auto_edit_save(slug: str, user: str = Depends(_admin), subject: str = Form(.
     subj_t, html_t = render.render_auto(key)
     try:
         send.send_email(config.APPROVER_EMAIL,
-                        f"[TEST - automatic email] {render.render(subj_t, sample)}",
+                        f"[TEST - automatic email] {render.render(subj_t, sample, plain=True)}",
                         render.render(html_t, sample))
     except Exception:
         pass
@@ -1101,7 +1101,8 @@ def admin_preview(user: str = Depends(_admin), name: str = Form(...),
     preview_html = render.render(_campaign_html(heading, body, audience), sample)
     m = re.search(r"<body[^>]*>(.*)</body>", preview_html, re.S)
     inner = m.group(1) if m else preview_html
-    subject_display = render.render(subject, sample) if "{{" in subject else subject
+    subject_display = (render.render(subject, sample, plain=True)
+                       if "{{" in subject else subject)
     confirm_label = ("LOOKS GOOD - CREATE" if return_action == "/admin/create"
                      else "LOOKS GOOD - SAVE")
     hidden = _hidden_fields(name, subject, heading, body, audience, return_action,

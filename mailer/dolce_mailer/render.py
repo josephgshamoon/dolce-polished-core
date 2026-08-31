@@ -35,8 +35,12 @@ def render_auto(key: str):
     return row["subject"], html
 
 
-def render(html: str, contact) -> str:
+def render(html: str, contact, plain: bool = False) -> str:
+    """Merge contact fields into html (or, with plain=True, into a plain-text
+    string such as a subject line, where HTML-escaping must not apply)."""
     first = (contact["first_name"] or "").strip() or "there"
+    if not plain:
+        first = html_mod.escape(first)
     unsub = f"{config.APP_BASE_URL}/unsubscribe/{contact['unsub_token']}"
     base = config.APP_BASE_URL
     return (html.replace("{{first_name}}", first)
