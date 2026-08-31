@@ -498,6 +498,7 @@ _FORM_CSS = """
 AUTO_LABELS = {"welcome:dolce": "Welcome email - Dolce",
                "welcome:polished": "Welcome email - Polished",
                "welcome:core": "Welcome email - Core",
+               "review:dolce": "Review request - Dolce (14 days after the welcome)",
                "birthday:dolce": "Birthday email - Dolce",
                "birthday:polished": "Birthday email - Polished",
                "birthday:core": "Birthday email - Core"}
@@ -587,7 +588,7 @@ border-bottom:1px solid var(--line);font-size:14px;}}
 
 def _auto_key(slug: str) -> str | None:
     key = (slug.replace("-", ":", 1)
-           if slug.startswith(("welcome-", "birthday-")) else slug)
+           if slug.startswith(("welcome-", "birthday-", "review-")) else slug)
     return key if key in AUTO_LABELS else None
 
 

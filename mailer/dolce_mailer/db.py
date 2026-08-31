@@ -157,6 +157,14 @@ AUTO_SEEDS = {
         "is always here to help.\n\n"
         "Ready to book or have a question?\n"
         "Message us on WhatsApp and our team will be happy to assist you."),
+    "review:dolce": ("How was your visit to Dolce?", "Your feedback means the world",
+        "Thank you for trusting us with your care - it truly means a lot to "
+        "everyone at the clinic.\n\n"
+        "If you have a minute, we would love it if you could {{review_link}}. "
+        "It takes less than a minute, it helps others in Erbil find us, and we "
+        "read every single one.\n\n"
+        "And if anything about your visit wasn't perfect, please message us on "
+        "WhatsApp - we always want to hear it and make it right."),
     "birthday:dolce": ("Happy birthday from Dolce", "Happy birthday, {{first_name}}!",
         "All of us at Dolce wish you a wonderful birthday and a beautiful year "
         "ahead.\n\n"

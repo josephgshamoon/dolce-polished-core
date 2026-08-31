@@ -51,3 +51,5 @@ def run():
 
 if __name__ == "__main__":
     alerts.guard("welcome job", run)
+    from . import review_job
+    alerts.guard("review job", review_job.run)
